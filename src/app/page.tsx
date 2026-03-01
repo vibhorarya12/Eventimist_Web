@@ -210,16 +210,16 @@ function Nav() {
           </span>
         </div>
         <div className="hidden md:flex items-center gap-8 text-sm text-stone-500 font-medium">
-          {["Discover", "Organize", "Volunteer", "Organizations"].map((item) => (
-            <a key={item} href="organize" className="hover:text-stone-900 transition-colors duration-200">
-              {item}
+          {[ {Item:"Discover", link:"/discover"}, {Item:"Organize", link:"/organize"}, {Item:"Volunteer", link:"/volunteer"}, {Item:"Organizations", link:"/organizations"} ].map((navs) => (
+            <a key={navs.Item} href={navs.link} className="hover:text-stone-900 transition-colors duration-200">
+               {navs.Item}
             </a>
           ))}
         </div>
         <div className="flex items-center gap-3">
-          <button className="hidden sm:block text-sm text-stone-600 hover:text-stone-900 transition-colors px-4 py-2 rounded-lg hover:bg-stone-100">
+          <a href="/user" className="hidden sm:block text-sm text-stone-600 hover:text-stone-900 transition-colors px-4 py-2 rounded-lg hover:bg-stone-100">
             Sign In
-          </button>
+          </a>
           <button className="text-sm font-bold bg-stone-900 hover:bg-stone-700 text-white px-5 py-2.5 rounded-xl transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]">
             Get Started
           </button>
