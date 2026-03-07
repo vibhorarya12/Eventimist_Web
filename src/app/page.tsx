@@ -210,7 +210,7 @@ function Nav() {
           </span>
         </div>
         <div className="hidden md:flex items-center gap-8 text-sm text-stone-500 font-medium">
-          {[ {Item:"Discover", link:"/discover"}, {Item:"Organize", link:"/organize"}, {Item:"Volunteer", link:"/volunteer"}, {Item:"Eventix Space", link:"/eventix"} ].map((navs) => (
+          {[ {Item:"Discover", link:"/discover"}, {Item:"Organize", link:"/organizer"}, {Item:"Volunteer", link:"/volunteer"}, {Item:"Eventix Space", link:"/eventix"} ].map((navs) => (
             <a key={navs.Item} href={navs.link} className="hover:text-stone-900 transition-colors duration-200">
                {navs.Item}
             </a>
