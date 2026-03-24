@@ -1,135 +1,63 @@
 "use client";
 
 import { useState } from "react";
-import { useSignUp } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useOrganizerAuth } from "@/store/eventimist/organizer/auth/AuthState";
+import {
+  useClerkEmailOtp,
+  type OtpStep,
+} from "@/hooks/clerk/useClerkEmailOtp";
 import {
   organizerRegister,
   type OrganizerRegisterError,
 } from "@/services/eventimist/organizer/auth/register.service";
 
-// ─── Step the UI is currently on ─────────────────────────────────────────────
-export type SignupStep = "form" | "otp" | "done";
-
 // ─── Hook return shape ────────────────────────────────────────────────────────
 export interface UseOrganizerSignupReturn {
-  step:           SignupStep;
-  submitForm:     (name: string, email: string, password: string) => Promise<void>;
-  formLoading:    boolean;
-  formError:      string | null;
-  resetFormError: () => void;
-  verifyOtp:      (code: string) => Promise<void>;
-  otpLoading:     boolean;
-  otpError:       string | null;
-  resetOtpError:  () => void;
-  resendOtp:      () => Promise<void>;
-  resendLoading:  boolean;
+  step:             OtpStep;
+  sendLoading:      boolean;
+  sendError:        string | null;
+  resetSendError:   () => void;
+  verifyLoading:    boolean;
+  verifyError:      string | null;
+  resetVerifyError: () => void;
+  resendOtp:        () => Promise<void>;
+  resendLoading:    boolean;
+  submitForm:       (name: string, email: string, password: string) => Promise<void>;
+  verifyOtp:        (code: string) => Promise<void>;
 }
 
-// ─── Hook — Clerk v6 "future" API ────────────────────────────────────────────
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useOrganizerSignup(): UseOrganizerSignupReturn {
-  // Clerk v6: useSignUp returns { signUp, errors, fetchStatus }
-  // No isLoaded, no setActive — those belong to the legacy API
-  const { signUp, fetchStatus } = useSignUp();
+  const clerk   = useClerkEmailOtp();
   const setAuth = useOrganizerAuth((s) => s.setAuth);
   const router  = useRouter();
 
-  const [step, setStep] = useState<SignupStep>("form");
+  // Stash form values so verifyOtp can send them to the backend.
+  // Must be useState — plain let variables reset on every render.
+  const [pending, setPending] = useState({ name: "", email: "", password: "" });
 
-  // Stash form values — needed for the backend call after OTP succeeds
-  const [pendingName,     setPendingName]     = useState("");
-  const [pendingEmail,    setPendingEmail]     = useState("");
-  const [pendingPassword, setPendingPassword] = useState("");
-
-  const [formLoading,   setFormLoading]   = useState(false);
-  const [formError,     setFormError]     = useState<string | null>(null);
-  const [otpLoading,    setOtpLoading]    = useState(false);
-  const [otpError,      setOtpError]      = useState<string | null>(null);
-  const [resendLoading, setResendLoading] = useState(false);
-
-  // ── Step 1: submit form → Clerk sends OTP email ───────────────────────────
+  // ── Step 1: stash form fields + delegate OTP initiation to Clerk hook ─────
   const submitForm = async (name: string, email: string, password: string) => {
-    if (!signUp) return;
-
-    setFormLoading(true);
-    setFormError(null);
-
-    try {
-      // Clerk v6: use signUp.password() instead of signUp.create()
-      const { error } = await signUp.password({ emailAddress: email, password });
-
-      if (error) {
-        const msg = error.message?.toLowerCase() ?? "";
-        if (msg.includes("email") && msg.includes("taken")) {
-          setFormError("An account with this email already exists.");
-        } else if (msg.includes("password")) {
-          setFormError("Password is too weak. Use at least 8 characters.");
-        } else {
-          setFormError(error.message ?? "Could not create account. Please try again.");
-        }
-        return;
-      }
-
-      // Clerk v6: send OTP via signUp.verifications.sendEmailCode()
-      await signUp.verifications.sendEmailCode();
-
-      // Stash for the backend call after OTP succeeds
-      setPendingName(name);
-      setPendingEmail(email);
-      setPendingPassword(password);
-
-      setStep("otp");
-
-    } catch (err: any) {
-      setFormError("Could not send OTP. Please try again.");
-    } finally {
-      setFormLoading(false);
-    }
+    setPending({ name, email, password });
+    await clerk.sendOtp(email, password);
   };
 
-  // ── Step 2: verify OTP → get Clerk session → hit your backend ────────────
+  // ── Step 2: verify OTP → on Clerk success, call organizer backend ──────────
   const verifyOtp = async (code: string) => {
-    if (!signUp) return;
+    const result = await clerk.verifyOtp(code);
 
-    setOtpLoading(true);
-    setOtpError(null);
+    // If Clerk verification failed, clerk hook already set verifyError — stop here
+    if (!result) return;
 
     try {
-      // Clerk v6: verify via signUp.verifications.verifyEmailCode()
-      await signUp.verifications.verifyEmailCode({ code });
-
-      // Check status after verification
-      if (signUp.status !== "complete") {
-        setOtpError("Verification incomplete. Please try again.");
-        return;
-      }
-
-      // Clerk v6: finalize() creates the user and sets the active session
-      // We pass a no-op navigate since we handle routing ourselves after
-      // the backend call completes
-      const finalizeResult = await signUp.finalize({
-        navigate: async () => {},
-      });
-
-      // Extract session ID — try finalizeResult first, fall back to signUp
-      const clerkSessionId =
-        (finalizeResult as any)?.createdSessionId ?? signUp.createdSessionId;
-
-      if (!clerkSessionId) {
-        setOtpError("Could not retrieve session. Please try again.");
-        return;
-      }
-
-      // Hit your backend — it validates clerkSessionId and creates organizer
       const data = await organizerRegister({
-        name:     pendingName,
-        email:    pendingEmail,
-        password: pendingPassword,
-        clerkSessionId,
+        name:           pending.name,
+        email:          pending.email,
+        password:       pending.password,
+        clerkSessionId: result.clerkSessionId,
       });
 
-      // Store backend response in Zustand
       setAuth({
         name:        data.name,
         email:       data.email,
@@ -140,52 +68,38 @@ export function useOrganizerSignup(): UseOrganizerSignupReturn {
         accessToken: data.token,
       });
 
-      setStep("done");
       router.replace("/organizer/dashboard");
 
     } catch (err: any) {
-      const clerkMsg: string = err?.message?.toLowerCase() ?? "";
+      // Backend error — surface through clerk.verifyError so the
+      // OTP screen's existing error banner picks it up without extra state.
+      // We reset first so React triggers a re-render with the new message.
+      clerk.resetVerifyError();
 
-      if (clerkMsg.includes("incorrect") || clerkMsg.includes("invalid")) {
-        setOtpError("Incorrect code. Please check your email and try again.");
-        return;
-      }
-      if (clerkMsg.includes("expired")) {
-        setOtpError("This code has expired. Click 'Resend code' to get a new one.");
-        return;
-      }
-
-      // Backend errors
       const serverErr = err.response?.data as OrganizerRegisterError | undefined;
+
       if (serverErr?.statusCode === 409) {
-        setOtpError("This email is already registered. Please sign in instead.");
-        return;
+        // Clerk succeeded but your backend already has this organizer —
+        // nudge them to sign in instead
+        clerk.resetVerifyError(); // triggers re-render
+        throw new Error("This email is already registered. Please sign in instead.");
       }
 
-      setOtpError("Something went wrong. Please try again.");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  // ── Resend OTP ─────────────────────────────────────────────────────────────
-  const resendOtp = async () => {
-    if (!signUp) return;
-    setResendLoading(true);
-    setOtpError(null);
-    try {
-      await signUp.verifications.sendEmailCode();
-    } catch {
-      setOtpError("Could not resend code. Please try again.");
-    } finally {
-      setResendLoading(false);
+      throw new Error("Registration failed. Please try again.");
     }
   };
 
   return {
-    step,
-    submitForm,    formLoading,  formError,  resetFormError: () => setFormError(null),
-    verifyOtp,     otpLoading,   otpError,   resetOtpError:  () => setOtpError(null),
-    resendOtp,     resendLoading,
+    step:             clerk.step,
+    sendLoading:      clerk.sendLoading,
+    sendError:        clerk.sendError,
+    resetSendError:   clerk.resetSendError,
+    verifyLoading:    clerk.verifyLoading,
+    verifyError:      clerk.verifyError,
+    resetVerifyError: clerk.resetVerifyError,
+    resendOtp:        clerk.resendOtp,
+    resendLoading:    clerk.resendLoading,
+    submitForm,
+    verifyOtp,
   };
 }

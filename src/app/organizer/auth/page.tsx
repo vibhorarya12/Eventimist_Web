@@ -251,10 +251,12 @@ function AuthPanel() {
   const [tab, setTab] = useState<Tab>("signup");
 
   // ── Signup hook (Clerk + backend) ─────────────────────────────────────────
-  const {
-    step, submitForm, formLoading, formError, resetFormError,
-    verifyOtp, otpLoading, otpError, resetOtpError, resendOtp, resendLoading,
-  } = useOrganizerSignup();
+ const {
+  step,
+  submitForm,  sendLoading:  formLoading,  sendError:  formError,  resetSendError:   resetFormError,
+  verifyOtp,   verifyLoading: otpLoading,  verifyError: otpError,  resetVerifyError: resetOtpError,
+  resendOtp,   resendLoading,
+} = useOrganizerSignup();
 
   // ── Login hook ─────────────────────────────────────────────────────────────
   const { login, loading: loginLoading, error: loginError, reset: resetLoginError } = useOrganizerLogin();
