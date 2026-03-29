@@ -13,7 +13,7 @@ export default function SSOCallback(){
     const completeSignIn = async () => {
       try {
         const result = await handleRedirectCallback({});
-        console.log("Google OAuth Success:", result);
+        console.warn("Google OAuth Success:<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<", result);
      
       } catch (error) {
         console.error("Google OAuth Error:", error);

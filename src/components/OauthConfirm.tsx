@@ -1,27 +1,19 @@
 "use client"
 
+import { useOrganizerOAuth } from '@/hooks/eventimist/organizer/auth/useOrganizerOAuth';
 import { useClerk } from '@clerk/nextjs';
-import React from 'react';
-
-interface OauthConfirmProps {
-  email?: string;
-  avatarUrl?: string;
-  onContinue?: () => void;
-  onCancel?: () => void;
-}
 
 
 
-export default function OauthConfirm({
-  email = "user@example.com",
-  avatarUrl = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
-  onContinue,
-  onCancel
-}: OauthConfirmProps) {
 
- const {user , signOut} = useClerk();
+export default function OauthConfirm() {
 
+ const {user , signOut , session} = useClerk();
+  
+ const {completeOAuthLogin , isLoading , error , clearError} = useOrganizerOAuth();
 
+ const email  = user?.emailAddresses[0].emailAddress;
+ const clerkSessionID = session?.id;
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -39,6 +31,21 @@ export default function OauthConfirm({
 
           {/* Content */}
           <div className="px-6 py-8">
+            {/* Error Message */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start justify-between">
+                <p className="text-red-800 text-sm">{error}</p>
+                <button
+                  onClick={clearError}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
             {/* Avatar */}
             <div className="flex justify-center mb-6">
               <div className="relative">
@@ -72,15 +79,23 @@ export default function OauthConfirm({
             {/* Buttons */}
             <div className="space-y-3">
               <button
-                onClick={onContinue}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 transform hover:scale-[1.02] hover:cursor-pointer shadow-lg hover:shadow-xl"
+                onClick={()=>completeOAuthLogin(email!,clerkSessionID!)}
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 transform hover:scale-[1.02] hover:cursor-pointer shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
               >
-                Continue with this account
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-3 border-t-white border-gray-300 rounded-full animate-spin mr-2"></div>
+                  </div>
+                ) : (
+                  "Continue with this account"
+                )}
               </button>
 
               <button
-                 onClick={async () => await signOut({ redirectUrl: '/organizer/auth/signup' })}
-                className="w-full bg-gray-100 hover:bg-gray-200 hover:cursor-pointer text-gray-700 font-medium py-3 px-4 rounded-xl transition-all duration-200 border border-gray-200"
+                 onClick={async () => await signOut({ redirectUrl: '/organizer/auth' })}
+                 disabled={isLoading}
+                className="w-full bg-gray-100 hover:bg-gray-200 hover:cursor-pointer text-gray-700 font-medium py-3 px-4 rounded-xl transition-all duration-200 border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 No, use a different account
               </button>
