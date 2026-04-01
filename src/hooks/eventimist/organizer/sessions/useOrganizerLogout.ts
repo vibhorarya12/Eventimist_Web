@@ -2,10 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useOrganizerAuth } from "@/store/eventimist/organizer/auth/AuthState";
+import { useClerk } from "@clerk/nextjs";
 
 export function useOrganizerLogout() {
   const clearAuth = useOrganizerAuth((s) => s.clearAuth);
   const router    = useRouter();
+  const {signOut} = useClerk();
 
   const logout = () => {
     // 1. Clear Zustand store + localStorage
@@ -16,6 +18,8 @@ export function useOrganizerLogout() {
     document.cookie = "organizer-token=; path=/; max-age=0";
 
     // 3. Redirect to auth page
+    
+    signOut({redirectUrl: "/organizer/auth"});
     router.replace("/organizer/auth");
   };
 
