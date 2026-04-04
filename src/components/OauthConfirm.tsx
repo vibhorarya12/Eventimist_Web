@@ -3,17 +3,32 @@
 import { useOrganizerOAuth } from '@/hooks/eventimist/organizer/auth/useOrganizerOAuth';
 import { useClerk } from '@clerk/nextjs';
 
+interface OauthConfirmProps {
+  purpose?: 'login' | 'signup'; // 'login' or 'signup', defaults to 'login'
+}
 
-
-
-export default function OauthConfirm() {
+export default function OauthConfirm({ purpose = 'login' }: OauthConfirmProps) {
 
  const {user , signOut , session} = useClerk();
   
- const {completeOAuthLogin , isLoading , error , clearError} = useOrganizerOAuth();
+ const {completeOAuthLogin , completeOauthSignup , isLoading , error , clearError} = useOrganizerOAuth();
 
  const email  = user?.emailAddresses[0].emailAddress;
  const clerkSessionID = session?.id;
+ const name = user?.fullName || '';
+ const profilePic = user?.imageUrl;
+
+ const handleConfirm = async () => {
+   if (purpose === 'signup') {
+     await completeOauthSignup(name, email!, clerkSessionID!, profilePic);
+   } else {
+     await completeOAuthLogin(email!, clerkSessionID!);
+   }
+ };
+
+ const buttonText = purpose === 'signup' 
+   ? 'Create Account with this email' 
+   : 'Continue with this account';
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -79,7 +94,7 @@ export default function OauthConfirm() {
             {/* Buttons */}
             <div className="space-y-3">
               <button
-                onClick={()=>completeOAuthLogin(email!,clerkSessionID!)}
+                onClick={handleConfirm}
                 disabled={isLoading}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 transform hover:scale-[1.02] hover:cursor-pointer shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
               >
@@ -88,7 +103,7 @@ export default function OauthConfirm() {
                     <div className="w-5 h-5 border-3 border-t-white border-gray-300 rounded-full animate-spin mr-2"></div>
                   </div>
                 ) : (
-                  "Continue with this account"
+                  buttonText
                 )}
               </button>
 
