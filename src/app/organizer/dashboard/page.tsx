@@ -667,7 +667,7 @@ export default function OrganizerDashboard() {
       <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map(item => (
           <button key={item.tab} onClick={() => handleTabChange(item.tab)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:cursor-pointer text-sm font-semibold transition-all ${
               activeTab === item.tab
                 ? d(dark,"bg-amber-400/12 text-amber-400 border border-amber-400/18","bg-amber-100 text-amber-700 border border-amber-200")
                 : `${T.text2(dark)} ${d(dark,"hover:text-white hover:bg-white/6","hover:text-gray-900 hover:bg-gray-100")}`
