@@ -16,7 +16,7 @@ interface ActivityItem {
   kind: "rsvp" | "cancel" | "publish" | "comment" | "payout";
 }
 
-type NavTab = "dashboard" | "events" | "audience" | "revenue" | "analytics" | "settings";
+type NavTab = "dashboard" | "audience" | "revenue" | "analytics" | "settings";
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 const EVENTS: OrgEvent[] = [
@@ -185,7 +185,7 @@ function Calendar({ events, onDaySelect, selectedDay, dark }: { events: OrgEvent
           const tod=day?isToday(day):false;
           return (
             <div key={idx} onClick={()=>day&&evs.length>0?onDaySelect(active?null:day):undefined}
-              className={`relative min-h-[40px] sm:min-h-[52px] p-1 sm:p-1.5 border-r border-b ${T.border(dark)} transition-all ${day&&evs.length>0?"cursor-pointer":"cursor-default"} ${active?d(dark,"bg-amber-400/12","bg-amber-100"):day&&evs.length>0?d(dark,"hover:bg-white/4","hover:bg-gray-50"):""}`}>
+              className={`relative p-1 sm:p-1.5 border-r border-b ${T.border(dark)} transition-all ${day&&evs.length>0?"cursor-pointer":"cursor-default"} ${active?d(dark,"bg-amber-400/12","bg-amber-100"):day&&evs.length>0?d(dark,"hover:bg-white/4","hover:bg-gray-50"):""}`}>
               {day&&(<>
                 <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-[11px] font-bold mb-1 transition-all ${active?"bg-amber-500 text-white":tod?d(dark,"bg-white/12 text-white ring-1 ring-white/25","bg-gray-200 text-gray-900 ring-1 ring-gray-300"):T.text3(dark)}`}>{day}</div>
                 {evs.length>0&&<div className="flex flex-wrap gap-0.5">{evs.slice(0,2).map((ev,i)=>{const tc=TYPE_META[ev.type]??TYPE_META.default;return <span key={i} className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full ${tc.dot} ${ev.status==="live"?"animate-pulse":""}`}/>;})}{evs.length>2&&<span className={`text-[7px] ${T.text3(dark)} font-bold`}>+{evs.length-2}</span>}</div>}
@@ -228,17 +228,28 @@ function LogoutModal({ onConfirm, onCancel, dark }: { onConfirm:()=>void; onCanc
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
+const PAGE_SIZE = 6; // cards per page
+
 function TabDashboard({ dark }: { dark: boolean }) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [evFilter, setEvFilter] = useState<"all"|"live"|"upcoming"|"draft"|"ended">("all");
+  const [evFilter, setEvFilter]       = useState<"all"|"live"|"upcoming"|"draft"|"ended">("all");
+  const [page, setPage]               = useState(1);
+
   const dayEvents = useMemo(() => {
     if (!selectedDay) return [];
     const today = new Date();
     return EVENTS.filter(ev => { const d2=new Date(ev.date); return d2.getDate()===selectedDay&&d2.getMonth()===today.getMonth()&&d2.getFullYear()===today.getFullYear(); });
   }, [selectedDay]);
+
   const filtered     = evFilter==="all"?EVENTS:EVENTS.filter(e=>e.status===evFilter);
+  const totalPages   = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated    = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
   const totalRsvps   = EVENTS.filter(e=>e.status!=="ended").reduce((s,e)=>s+e.rsvps,0);
   const totalRevenue = EVENTS.reduce((s,e)=>s+e.revenue,0);
+
+  // Reset to page 1 when filter changes
+  const handleFilter = (f: typeof evFilter) => { setEvFilter(f); setPage(1); };
+
   return (
     <div className="space-y-5 sm:space-y-7">
       {/* KPI cards */}
@@ -290,19 +301,117 @@ function TabDashboard({ dark }: { dark: boolean }) {
         </div>
       </div>
 
-      {/* Events table */}
+      {/* ── My Events — card grid with pagination ───────────────────────────── */}
       <div className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl overflow-hidden`}>
+        {/* Header */}
         <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b ${T.border(dark)}`}>
-          <h3 className={`${T.text1(dark)} font-black text-sm sm:text-base`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>All Events</h3>
-          <div className={`flex items-center gap-1 ${d(dark,"bg-white/5 border-white/8","bg-gray-100 border-gray-200")} border rounded-xl p-1 overflow-x-auto`}>
-            {(["all","live","upcoming","draft","ended"] as const).map(f=>(
-              <button key={f} onClick={()=>setEvFilter(f)} className={`text-[10px] font-black capitalize px-2.5 sm:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${evFilter===f?"bg-amber-500 text-white shadow-sm":`${T.text3(dark)} ${d(dark,"hover:text-white","hover:text-gray-700")}`}`}>{f}</button>
-            ))}
+          <div className="flex items-center gap-3">
+            <h3 className={`${T.text1(dark)} font-black text-sm sm:text-base`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>My Events</h3>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${d(dark,"bg-white/8 text-white/40","bg-gray-100 text-gray-500")}`}>{filtered.length} total</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-1 ${d(dark,"bg-white/5 border-white/8","bg-gray-100 border-gray-200")} border rounded-xl p-1 overflow-x-auto`}>
+              {(["all","live","upcoming","draft","ended"] as const).map(f=>(
+                <button key={f} onClick={()=>handleFilter(f)}
+                  className={`text-[10px] font-black capitalize px-2.5 sm:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${evFilter===f?"bg-amber-500 text-white shadow-sm":`${T.text3(dark)} ${d(dark,"hover:text-white","hover:text-gray-700")}`}`}>{f}
+                </button>
+              ))}
+            </div>
+            <a href="/organizer/create_event" className={`flex items-center gap-1 text-[10px] font-black text-white bg-gradient-to-r from-amber-500 to-orange-600 px-2.5 py-1.5 rounded-xl hover:shadow-md transition-all whitespace-nowrap`}>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New
+            </a>
           </div>
         </div>
-        <div className={`divide-y ${d(dark,"divide-white/5","divide-gray-100")} px-2 py-1`}>
-          {filtered.length===0 ? <div className={`py-12 text-center ${T.text3(dark)} text-sm`}>No events found</div>
-            : filtered.map(ev=><EventRow key={ev.id} event={ev} dark={dark}/>)}
+
+        {/* Card grid */}
+        <div className="p-4 sm:p-5">
+          {paginated.length === 0 ? (
+            <div className={`py-12 text-center ${T.text3(dark)} text-sm`}>No events found</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {paginated.map(ev => {
+                const sm  = dark ? SM_DARK[ev.status] : SM_LIGHT[ev.status];
+                const tc  = TYPE_META[ev.type] ?? TYPE_META.default;
+                const occ = pct(ev.rsvps, ev.capacity);
+                return (
+                  <div key={ev.id} className={`${d(dark,"bg-white/4 border-white/8","bg-gray-50 border-gray-200")} border rounded-2xl overflow-hidden group hover:-translate-y-0.5 transition-all hover:shadow-lg`}>
+                    {/* Image */}
+                    <div className="relative h-32 overflow-hidden">
+                      <img src={ev.image} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"/>
+                      <span className={`absolute top-2.5 left-2.5 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${sm.bg} ${sm.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${sm.dot} ${ev.status==="live"?"animate-pulse":""}`}/>{sm.label}
+                      </span>
+                      <span className={`absolute top-2.5 right-2.5 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${tc.bg} ${tc.text}`}>
+                        {ev.type}
+                      </span>
+                    </div>
+                    {/* Content */}
+                    <div className="p-3.5">
+                      <h4 className={`${T.text1(dark)} font-bold text-xs leading-snug line-clamp-2 mb-1`}>{ev.title}</h4>
+                      <p className={`${T.text3(dark)} text-[10px] mb-2.5`}>{ev.venue.split(",")[0]} · {new Date(ev.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</p>
+                      {/* Occupancy */}
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className={`${T.text3(dark)} text-[10px]`}>{ev.rsvps.toLocaleString()} RSVPs</span>
+                        <span className={`${T.text3(dark)} text-[10px] font-bold`}>{occ}%</span>
+                      </div>
+                      <div className={`h-1 ${d(dark,"bg-white/8","bg-gray-200")} rounded-full overflow-hidden mb-3`}>
+                        <div className="h-full rounded-full transition-all" style={{width:`${occ}%`,background:occ>=90?"#f87171":occ>=70?"#fbbf24":"#34d399"}}/>
+                      </div>
+                      {/* Footer */}
+                      <div className="flex items-center justify-between">
+                        <span className={`${T.text2(dark)} text-xs font-bold`}>{ev.revenue ? fmt(ev.revenue) : "Free"}</span>
+                        <div className="flex gap-1.5">
+                          <a href={`/events/${ev.id}`} className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 border border-gray-200")} flex items-center justify-center transition-all`}>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          </a>
+                          <button className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 border border-gray-200")} flex items-center justify-center transition-all`}>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-5 pt-4 border-t border-dashed border-opacity-50"
+              style={{borderColor: dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}}>
+              {/* Info */}
+              <span className={`${T.text3(dark)} text-[11px]`}>
+                Showing <span className={`${T.text2(dark)} font-bold`}>{(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE,filtered.length)}</span> of <span className={`${T.text2(dark)} font-bold`}>{filtered.length}</span>
+              </span>
+              {/* Controls */}
+              <div className="flex items-center gap-1">
+                {/* Prev */}
+                <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed ${d(dark,"text-white/50 hover:text-white hover:bg-white/8","text-gray-500 hover:text-gray-900 hover:bg-gray-100")}`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                {/* Page numbers */}
+                {Array.from({length: totalPages}, (_,i) => i+1).map(p => (
+                  <button key={p} onClick={()=>setPage(p)}
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
+                      p === page
+                        ? "bg-amber-500 text-white shadow-sm shadow-amber-500/30"
+                        : `${T.text3(dark)} ${d(dark,"hover:text-white hover:bg-white/8","hover:text-gray-900 hover:bg-gray-100")}`
+                    }`}>
+                    {p}
+                  </button>
+                ))}
+                {/* Next */}
+                <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed ${d(dark,"text-white/50 hover:text-white hover:bg-white/8","text-gray-500 hover:text-gray-900 hover:bg-gray-100")}`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6"/></svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -334,74 +443,6 @@ function TabDashboard({ dark }: { dark: boolean }) {
             ))}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── My Events Tab ────────────────────────────────────────────────────────────
-function TabEvents({ dark }: { dark: boolean }) {
-  const [filter, setFilter] = useState<"all"|"live"|"upcoming"|"draft"|"ended">("all");
-  const filtered = filter==="all"?EVENTS:EVENTS.filter(e=>e.status===filter);
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h2 className={`${T.text1(dark)} font-black text-lg sm:text-xl`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>My Events</h2>
-        <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1 ${d(dark,"bg-white/5 border-white/8","bg-gray-100 border-gray-200")} border rounded-xl p-1 overflow-x-auto`}>
-            {(["all","live","upcoming","draft","ended"] as const).map(f=>(
-              <button key={f} onClick={()=>setFilter(f)} className={`text-[10px] font-black capitalize px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap ${filter===f?"bg-amber-500 text-white shadow-sm":`${T.text3(dark)} ${d(dark,"hover:text-white","hover:text-gray-700")}`}`}>{f}</button>
-            ))}
-          </div>
-          <a href="/organizer/create_event" className="flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-amber-500 to-orange-600 px-3 py-2 rounded-xl hover:shadow-lg transition-all whitespace-nowrap">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New
-          </a>
-        </div>
-      </div>
-      {/* Grid view */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map(ev=>{
-          const sm=dark?SM_DARK[ev.status]:SM_LIGHT[ev.status];
-          const tc=TYPE_META[ev.type]??TYPE_META.default;
-          const occ=pct(ev.rsvps,ev.capacity);
-          return (
-            <div key={ev.id} className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl overflow-hidden group hover:-translate-y-0.5 transition-all hover:shadow-lg`}>
-              <div className="relative h-36 overflow-hidden">
-                <img src={ev.image} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"/>
-                <span className={`absolute top-3 left-3 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full ${sm.bg} ${sm.text} backdrop-blur-sm`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${sm.dot} ${ev.status==="live"?"animate-pulse":""}`}/>{sm.label}
-                </span>
-                <span className={`absolute top-3 right-3 inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full ${tc.bg} ${tc.text} backdrop-blur-sm`}>
-                  {ev.type}
-                </span>
-              </div>
-              <div className="p-4">
-                <h3 className={`${T.text1(dark)} font-bold text-sm leading-snug line-clamp-2 mb-1`}>{ev.title}</h3>
-                <p className={`${T.text3(dark)} text-[10px] mb-3`}>{ev.venue.split(",")[0]} · {new Date(ev.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</p>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`${T.text3(dark)} text-[10px]`}>{ev.rsvps.toLocaleString()} / {ev.capacity.toLocaleString()} RSVPs</span>
-                  <span className={`${T.text3(dark)} text-[10px] font-bold`}>{occ}%</span>
-                </div>
-                <div className={`h-1.5 ${d(dark,"bg-white/8","bg-gray-100")} rounded-full overflow-hidden mb-3`}>
-                  <div className="h-full rounded-full transition-all" style={{width:`${occ}%`,background:occ>=90?"#f87171":occ>=70?"#fbbf24":"#34d399"}}/>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className={`${T.text2(dark)} text-sm font-bold`}>{ev.revenue?fmt(ev.revenue):"Free"}</span>
-                  <div className="flex gap-1.5">
-                    <a href={`/events/${ev.id}`} className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900")} flex items-center justify-center transition-all`}>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    </a>
-                    <button className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900")} flex items-center justify-center transition-all`}>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
@@ -627,7 +668,6 @@ export default function OrganizerDashboard() {
 
   const NAV_ITEMS: { label: string; tab: NavTab; icon: React.ReactNode }[] = [
     { label:"Dashboard", tab:"dashboard", icon:<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> },
-    { label:"My Events", tab:"events",    icon:<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
     { label:"Audience",  tab:"audience",  icon:<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> },
     { label:"Revenue",   tab:"revenue",   icon:<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> },
     { label:"Analytics", tab:"analytics", icon:<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
@@ -667,14 +707,14 @@ export default function OrganizerDashboard() {
       <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map(item => (
           <button key={item.tab} onClick={() => handleTabChange(item.tab)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:cursor-pointer text-sm font-semibold transition-all ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
               activeTab === item.tab
                 ? d(dark,"bg-amber-400/12 text-amber-400 border border-amber-400/18","bg-amber-100 text-amber-700 border border-amber-200")
                 : `${T.text2(dark)} ${d(dark,"hover:text-white hover:bg-white/6","hover:text-gray-900 hover:bg-gray-100")}`
-            }`}>
+            } hover:cursor-pointer`}>
             <span className={activeTab === item.tab ? "text-amber-400" : T.text3(dark)}>{item.icon}</span>
             {item.label}
-            {item.label === "My Events" && liveCount > 0 && (
+            {item.label === "Dashboard" && liveCount > 0 && (
               <span className={`ml-auto text-[9px] font-black ${d(dark,"bg-emerald-400/15 text-emerald-400 border border-emerald-400/20","bg-emerald-100 text-emerald-700 border border-emerald-200")} px-1.5 py-0.5 rounded-full`}>{liveCount} live</span>
             )}
           </button>
@@ -802,7 +842,7 @@ export default function OrganizerDashboard() {
                   activeTab === item.tab
                     ? "text-amber-500"
                     : T.text3(dark)
-                }`}>
+                } hover:cursor-pointer`}>
                 <span className="w-5 h-5">{item.icon}</span>
                 <span className="text-[9px] font-bold">{item.label.split(" ")[0]}</span>
               </button>
@@ -813,7 +853,6 @@ export default function OrganizerDashboard() {
           <main className="flex-1 px-4 sm:px-5 py-5 sm:py-7 overflow-y-auto pb-20 lg:pb-7">
             <div key={activeTab} className="tab-enter">
               {activeTab === "dashboard" && <TabDashboard dark={dark}/>}
-              {activeTab === "events"    && <TabEvents    dark={dark}/>}
               {activeTab === "audience"  && <TabAudience  dark={dark}/>}
               {activeTab === "revenue"   && <TabRevenue   dark={dark}/>}
               {activeTab === "analytics" && <TabAnalytics dark={dark}/>}
