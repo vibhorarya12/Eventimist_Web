@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 // Routes that require an organizer to be logged in
 const ORGANIZER_PROTECTED = [
   "/organizer/dashboard",
-  "/organizer/create_event",
+  "/organizer/create-event",
 ];
 
 // Routes that a logged-in organizer should NOT be able to visit
