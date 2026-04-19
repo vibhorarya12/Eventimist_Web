@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useCreateEvent } from "@/hooks/eventimist/organizer/event/useCreateEvent";
+import type { CreateEventRequest, EventCategory, EventMode } from "@/services/eventimist/organizer/event/Createevent.service";
+import { compressImages, type CompressionResult } from "@/utils/compressImages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Category =
@@ -118,7 +122,7 @@ function GoogleMap({ lat, lng, venueName, dark }: {
 }) {
   const hasCoords = lat !== "" && lng !== "";
   // Read key at render time — guaranteed available on client
-  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "";
+  const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
   if (!hasCoords) {
     return (
@@ -172,7 +176,7 @@ function ImageUploader({ files, onChange, dark }: { files: File[]; onChange: (f:
   const add = (newFiles: FileList | null) => {
     if (!newFiles) return;
     const valid = Array.from(newFiles).filter(f => f.type.startsWith("image/"));
-    onChange([...files, ...valid].slice(0, 8));
+    onChange([...files, ...valid].slice(0, 5));
   };
 
   return (
@@ -196,7 +200,7 @@ function ImageUploader({ files, onChange, dark }: { files: File[]; onChange: (f:
           </svg>
         </div>
         <p className={`${T.text2(dark)} text-sm font-semibold mb-1`}>Drop images here or <span className="text-amber-500 underline underline-offset-2">browse</span></p>
-        <p className={`${T.text3(dark)} text-[11px]`}>PNG, JPG, WEBP up to 10MB each · Max 8 images</p>
+        <p className={`${T.text3(dark)} text-[11px]`}>PNG, JPG, WEBP up to 10MB each · Min 2, Max 5 images</p>
       </div>
 
       {/* Preview grid */}
@@ -217,7 +221,7 @@ function ImageUploader({ files, onChange, dark }: { files: File[]; onChange: (f:
               </button>
             </div>
           ))}
-          {files.length < 8 && (
+          {files.length < 5 && (
             <button type="button" onClick={() => ref.current?.click()}
               className={`aspect-square rounded-xl border-2 border-dashed ${d(dark,"border-white/15 hover:border-amber-400/40","border-stone-200 hover:border-amber-300")} flex items-center justify-center transition-all`}>
               <svg className={`w-5 h-5 ${T.text3(dark)}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -294,7 +298,7 @@ export default function CreateEventPage() {
     title: "", description: "", category: "", startTime: "",
     endTime: "", timezone: "Asia/Kolkata", mode: "", venue: "",
     onlineLink: "", latitude: "", longitude: "", tags: [],
-    capacity: "", ticketPrice: "", isFree: false, files: [],
+    capacity: "", ticketPrice: "", isFree: true, files: [],
   });
 
   const set = <K extends keyof FormData>(key: K, val: FormData[K]) =>
@@ -305,6 +309,9 @@ export default function CreateEventPage() {
   const [venueSuggestions, setVenueSuggestions] = useState<PlaceSuggestion[]>([]);
   const [showSuggestions,  setShowSuggestions]  = useState(false);
   const [venueLoading,     setVenueLoading]     = useState(false);
+  const [showPaidModal,    setShowPaidModal]    = useState(false);
+  const [compressing,      setCompressing]      = useState(false);
+  const [compressionResults, setCompressionResults] = useState<CompressionResult[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Autocomplete: Places Autocomplete API (no CORS issue — proxied via Next.js route or called with key)
@@ -338,7 +345,12 @@ export default function CreateEventPage() {
     try {
       const res  = await fetch(`/api/places/details?place_id=${encodeURIComponent(suggestion.place_id)}`);
       const data = await res.json();
-      if (data.result?.geometry?.location) {
+      if (data.result?.location) {
+        const { lat, lng } = data.result.location;
+        set("latitude",  lat);
+        set("longitude", lng);
+      } else if (data.result?.geometry?.location) {
+        // fallback in case route returns raw Google response
         const { lat, lng } = data.result.geometry.location;
         set("latitude",  lat);
         set("longitude", lng);
@@ -350,9 +362,26 @@ export default function CreateEventPage() {
     }
   };
 
+  // ── Compression ────────────────────────────────────────────────────────────
+  const handleCompress = async () => {
+    if (form.files.length === 0) return;
+    setCompressing(true);
+    setCompressionResults([]);
+    try {
+      const results = await compressImages(form.files);
+      setCompressionResults(results);
+      // Swap form files with compressed versions
+      set("files", results.map(r => r.compressed));
+    } finally {
+      setCompressing(false);
+    }
+  };
+
   // ── Submission ─────────────────────────────────────────────────────────────
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const router   = useRouter();
+  const { submit, loading: submitting, error: apiError, reset: resetApiError } = useCreateEvent();
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdTitle,     setCreatedTitle]     = useState("");
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
 
   const validate = () => {
@@ -367,52 +396,64 @@ export default function CreateEventPage() {
     if ((form.mode === "OFFLINE" || form.mode === "HYBRID") && !form.venue) e.venue = "Venue is required for this mode";
     if ((form.mode === "ONLINE" || form.mode === "HYBRID") && !form.onlineLink) e.onlineLink = "Online link is required for this mode";
     if (!form.capacity || Number(form.capacity) < 1) e.capacity = "Capacity must be at least 1";
-    if (!form.isFree && (!form.ticketPrice || Number(form.ticketPrice) < 0)) e.ticketPrice = "Enter a valid price";
+    if (form.files.length < 2) e.files = "Please upload at least 2 images";
     return e;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    resetApiError();
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setErrors({});
-    setSubmitting(true);
-    await new Promise(r => setTimeout(r, 1800));
-    setSubmitting(false);
-    setSubmitted(true);
+
+    // ── 1. Compress images before upload ──────────────────────────────────
+    let filesToUpload = form.files;
+    try {
+      setCompressing(true);
+      const results = await compressImages(form.files);
+      filesToUpload = results.map(r => r.compressed);
+    } catch {
+      // compression failed — fall back to originals, don't block submit
+    } finally {
+      setCompressing(false);
+    }
+
+    // ── 2. Build payload and fire API ─────────────────────────────────────
+    const payload: CreateEventRequest = {
+      title:       form.title,
+      description: form.description,
+      category:    form.category as EventCategory,
+      startTime:   form.startTime,
+      endTime:     form.endTime,
+      timezone:    form.timezone,
+      mode:        form.mode as EventMode,
+      capacity:    Number(form.capacity),
+      isFree:      true,
+      ticketPrice: null,
+      tags:        form.tags,
+      files:       filesToUpload,
+      ...(form.venue      ? { venue:      form.venue }      : {}),
+      ...(form.onlineLink ? { onlineLink: form.onlineLink } : {}),
+      ...(form.latitude  !== "" ? { latitude:  Number(form.latitude)  } : {}),
+      ...(form.longitude !== "" ? { longitude: Number(form.longitude) } : {}),
+    };
+
+    const result = await submit(payload);
+    if (result) {
+      setCreatedTitle(form.title);
+      setShowSuccessModal(true);
+    }
   };
 
   // ── Mode helpers ───────────────────────────────────────────────────────────
-  const needsVenue  = form.mode === "OFFLINE" || form.mode === "HYBRID";
-  const needsLink   = form.mode === "ONLINE"  || form.mode === "HYBRID";
+  const needsVenue = form.mode === "OFFLINE" || form.mode === "HYBRID";
+  const needsLink  = form.mode === "ONLINE"  || form.mode === "HYBRID";
 
   // ── Error helper ───────────────────────────────────────────────────────────
   const err = (key: keyof FormData) => errors[key]
     ? <p className="text-[10px] text-rose-400 font-medium mt-1">{errors[key]}</p>
     : null;
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // SUCCESS STATE
-  // ─────────────────────────────────────────────────────────────────────────
-  if (submitted) {
-    return (
-      <div className={`min-h-screen ${T.bg(dark)} flex items-center justify-center p-6`}>
-        <div className="text-center max-w-sm">
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-amber-400/30">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
-            </svg>
-          </div>
-          <h1 className={`${T.text1(dark)} font-black text-2xl mb-2`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>Event Created!</h1>
-          <p className={`${T.text2(dark)} text-sm mb-6`}>Your event <strong className="text-amber-500">"{form.title}"</strong> has been submitted for review.</p>
-          <button onClick={() => { setSubmitted(false); setForm({ title:"",description:"",category:"",startTime:"",endTime:"",timezone:"Asia/Kolkata",mode:"",venue:"",onlineLink:"",latitude:"",longitude:"",tags:[],capacity:"",ticketPrice:"",isFree:false,files:[] }); }}
-            className="bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black px-6 py-3 rounded-2xl hover:shadow-lg hover:shadow-amber-400/30 transition-all">
-            Create Another
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -471,8 +512,8 @@ export default function CreateEventPage() {
                   i === 0 ? !!(form.title && form.description && form.category) :
                   i === 1 ? !!(form.startTime && form.endTime && form.mode) :
                   i === 2 ? (form.mode === "ONLINE" ? !!form.onlineLink : !!form.venue) :
-                  i === 3 ? !!(form.capacity && (form.isFree || form.ticketPrice)) :
-                  form.files.length > 0
+                  i === 3 ? !!(form.capacity) :
+                  form.files.length >= 2
                 );
                 return (
                   <div key={step} className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -663,6 +704,9 @@ export default function CreateEventPage() {
                 </Field>
               )}
 
+              {/* Map + lat/lng — only for OFFLINE or HYBRID */}
+              {(needsVenue || form.mode === "") && (
+                <>
               {/* Map */}
               {/* Real Google Map */}
               <GoogleMap lat={form.latitude} lng={form.longitude} venueName={form.venue} dark={dark}/>
@@ -678,6 +722,8 @@ export default function CreateEventPage() {
                     placeholder="77.2090" className={inputCls(dark)}/>
                 </Field>
               </div>
+                </>
+              )}
 
               {/* Online link */}
               {(needsLink || form.mode === "") && (
@@ -711,30 +757,17 @@ export default function CreateEventPage() {
                 {err("capacity")}
               </Field>
 
-              {/* Free toggle */}
+              {/* Free toggle — paid is coming soon */}
               <div className={`flex items-center justify-between p-4 rounded-xl ${d(dark,"bg-white/4 border border-white/8","bg-stone-50 border border-stone-200")}`}>
                 <div>
                   <div className={`${T.text1(dark)} text-sm font-bold`}>Free Event</div>
-                  <div className={`${T.text3(dark)} text-[11px] mt-0.5`}>Toggle on if this event is free to attend</div>
+                  <div className={`${T.text3(dark)} text-[11px] mt-0.5`}>Paid tickets are a Pro feature — coming soon!</div>
                 </div>
-                <button type="button" onClick={() => { set("isFree", !form.isFree); if (!form.isFree) set("ticketPrice", 0); }}
-                  className={`relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0 ${form.isFree ? "bg-amber-500" : d(dark,"bg-white/15","bg-stone-300")}`}>
-                  <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300 ${form.isFree ? "translate-x-6" : "translate-x-0.5"}`}/>
+                <button type="button" onClick={() => setShowPaidModal(true)}
+                  className="relative w-12 h-6 rounded-full bg-amber-500 flex-shrink-0">
+                  <div className="absolute top-0.5 translate-x-6 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300"/>
                 </button>
               </div>
-
-              {/* Ticket price */}
-              {!form.isFree && (
-                <Field dark={dark} label="Ticket Price (₹)" required hint="Base price per ticket in INR">
-                  <div className="relative">
-                    <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${T.text2(dark)} text-sm font-bold`}>₹</div>
-                    <input type="number" min="0" step="0.01" value={form.ticketPrice}
-                      onChange={e => set("ticketPrice", e.target.value ? Number(e.target.value) : "")}
-                      placeholder="199.99" className={inputCls(dark, `pl-8 ${errors.ticketPrice ? "border-rose-400/60" : ""}`)}/>
-                  </div>
-                  {err("ticketPrice")}
-                </Field>
-              )}
             </Section>
           </div>
 
@@ -742,33 +775,179 @@ export default function CreateEventPage() {
           <div className="fu d5">
             <Section dark={dark} title="Event Images" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>}>
               <ImageUploader files={form.files} onChange={v => set("files", v)} dark={dark}/>
+              {errors.files && <p className="text-[10px] text-rose-400 font-medium mt-1">{errors.files}</p>}
               <p className={`text-[10px] ${T.text3(dark)} mt-1`}>First image will be used as the cover. Recommended size: 1920×1080px.</p>
+
+              {/* ── Compress button — commented out (testing only) ──
+              {form.files.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleCompress}
+                  disabled={compressing}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                    ${d(dark,
+                      "bg-sky-400/12 border border-sky-400/25 text-sky-400 hover:bg-sky-400/20",
+                      "bg-sky-50 border border-sky-200 text-sky-600 hover:bg-sky-100"
+                    )}`}
+                >
+                  {compressing ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                      Compressing…
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4 14l4-8 4 8"/><path d="M12 14l4-8 4 8"/><line x1="5.5" y1="11" x2="10.5" y2="11"/><line x1="13.5" y1="11" x2="18.5" y2="11"/></svg>
+                      Compress Images ({form.files.length})
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* ── Compression results — commented out (testing only) ──
+              {compressionResults.length > 0 && (
+                <div className={`rounded-xl border ${T.border(dark)} overflow-hidden`}>
+                  <div className={`px-4 py-3 flex items-center justify-between border-b ${T.border(dark)} ${d(dark,"bg-emerald-400/8","bg-emerald-50")}`}>
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                      <span className={`text-xs font-black ${d(dark,"text-emerald-400","text-emerald-700")}`}>Compression Complete</span>
+                    </div>
+                    <span className={`text-[10px] font-bold ${T.text3(dark)}`}>
+                      {compressionResults.reduce((s,r) => s + r.originalSizeKB, 0)} KB
+                      {" → "}
+                      {compressionResults.reduce((s,r) => s + r.compressedSizeKB, 0)} KB
+                    </span>
+                  </div>
+                  <div className={`divide-y ${d(dark,"divide-white/6","divide-stone-100")}`}>
+                    {compressionResults.map((r, i) => (
+                      <div key={i} className="px-4 py-3 flex items-center gap-3">
+                        <img src={URL.createObjectURL(r.compressed)} alt={r.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className={`${T.text2(dark)} text-[11px] font-bold truncate`}>{r.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className={`${T.text3(dark)} text-[10px]`}>{r.originalSizeKB} KB</span>
+                            <svg className={`w-3 h-3 ${T.text3(dark)}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                            <span className="text-emerald-500 text-[10px] font-bold">{r.compressedSizeKB} KB</span>
+                          </div>
+                          <div className={`mt-1.5 h-1 rounded-full ${d(dark,"bg-white/8","bg-stone-100")} overflow-hidden`}>
+                            <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${r.savedPercent}%` }} />
+                          </div>
+                        </div>
+                        <span className={`flex-shrink-0 text-[10px] font-black px-2 py-1 rounded-lg
+                          ${r.savedPercent >= 50
+                            ? d(dark,"bg-emerald-400/15 text-emerald-400","bg-emerald-100 text-emerald-700")
+                            : r.savedPercent >= 20
+                              ? d(dark,"bg-amber-400/15 text-amber-400","bg-amber-100 text-amber-700")
+                              : d(dark,"bg-white/8 text-white/40","bg-stone-100 text-stone-500")
+                          }`}>
+                          -{r.savedPercent}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              ── end commented out ── */}
             </Section>
           </div>
 
           {/* ── Submit ── */}
+          {/* ── API error banner ── */}
+          {apiError && (
+            <div className="fu d6 flex items-start gap-3 bg-rose-500/10 border border-rose-500/25 text-rose-400 text-sm px-4 py-3 rounded-xl">
+              <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span>{apiError}</span>
+            </div>
+          )}
+
+          {/* ── Submit row ── */}
           <div className="fu d6 flex flex-col sm:flex-row gap-3 pb-8">
             <button type="button" onClick={() => window.history.back()}
               className={`flex-1 sm:flex-none sm:w-36 py-3.5 rounded-2xl font-bold text-sm border ${d(dark,"border-white/12 text-white/60 hover:text-white hover:border-white/25 hover:bg-white/5","border-stone-200 text-stone-500 hover:text-stone-900 hover:border-stone-300 hover:bg-stone-50")} transition-all`}>
               Cancel
             </button>
-            <button type="submit" disabled={submitting}
+            <button type="submit" disabled={submitting || compressing}
               className="flex-1 py-3.5 rounded-2xl font-black text-sm text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:shadow-xl hover:shadow-amber-500/30 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 transition-all flex items-center justify-center gap-2">
-              {submitting ? (
+              {compressing ? (
                 <>
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                  Publishing event…
+                  Compressing images…
+                </>
+              ) : submitting ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                  Saving draft…
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                  Publish Event
+                  Save Event
                 </>
               )}
             </button>
           </div>
         </form>
       </div>
+
+      {/* ── Success Modal ── */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className={`relative ${T.surface(dark)} border ${T.border(dark)} rounded-2xl shadow-2xl p-7 w-[340px] mx-4 text-center`}>
+            {/* Tick icon */}
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center mx-auto mb-5 shadow-xl shadow-emerald-400/30">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div className="inline-flex items-center gap-1.5 bg-emerald-400/15 border border-emerald-400/25 rounded-full px-3 py-1 mb-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"/>
+              <span className="text-emerald-400 text-[10px] font-black tracking-widest uppercase">Event Drafted</span>
+            </div>
+            <h3 className={`${T.text1(dark)} font-black text-lg mb-2`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>
+              Saved Successfully!
+            </h3>
+            <p className={`${T.text3(dark)} text-sm mb-6 leading-relaxed`}>
+              <span className="text-amber-500 font-bold">"{createdTitle}"</span> has been drafted.
+              Head to your dashboard to review and publish it.
+            </p>
+            <button
+              onClick={() => router.replace("/organizer/dashboard")}
+              className="w-full py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-400 to-orange-500 hover:shadow-lg hover:shadow-amber-400/25 hover:scale-[1.01] transition-all">
+              Go to Dashboard →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Paid Coming Soon Modal ── */}
+      {showPaidModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPaidModal(false)} />
+          <div className={`relative ${T.surface(dark)} border ${T.border(dark)} rounded-2xl shadow-2xl p-6 w-80 mx-4`}>
+            {/* Crown icon */}
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-400/30">
+              <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M2 19h20v2H2v-2zM2 6l5 5 5-7 5 7 5-5v11H2V6z"/>
+              </svg>
+            </div>
+            <div className="text-center mb-4">
+              <div className="inline-flex items-center gap-1.5 bg-amber-400/15 border border-amber-400/25 rounded-full px-3 py-1 mb-3">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"/>
+                <span className="text-amber-500 text-[10px] font-black tracking-widest uppercase">Pro Feature</span>
+              </div>
+              <h3 className={`${T.text1(dark)} font-black text-lg mb-1`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>Paid Tickets — Coming Soon</h3>
+              <p className={`${T.text3(dark)} text-sm leading-relaxed`}>
+                Paid ticketing is a premium feature currently in development. For now, all events on Eventimist are free to attend.
+              </p>
+            </div>
+            <button onClick={() => setShowPaidModal(false)}
+              className="w-full py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-400 to-orange-500 hover:shadow-lg hover:shadow-amber-400/25 transition-all">
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
