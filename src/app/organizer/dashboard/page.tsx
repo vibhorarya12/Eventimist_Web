@@ -697,7 +697,7 @@ export default function OrganizerDashboard() {
 
       {/* Create CTA */}
       <div className="px-4 py-4">
-        <a href="/organizer/create_event" className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-sm py-3 rounded-2xl hover:shadow-xl hover:shadow-amber-400/25 hover:scale-[1.02] transition-all">
+        <a href="/organizer/create-event" className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-sm py-3 rounded-2xl hover:shadow-xl hover:shadow-amber-400/25 hover:scale-[1.02] transition-all">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Create Event
         </a>
@@ -825,11 +825,11 @@ export default function OrganizerDashboard() {
               {profilePic ? <img src={profilePic} alt={name??""} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-2 ring-amber-400/30 cursor-pointer"/> :
                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-400/15 ring-2 ring-amber-400/25 flex items-center justify-center text-amber-500 font-black text-sm cursor-pointer">{avatarFallback}</div>}
 
-              <a href="/organizer/create_event" className="hidden sm:flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-amber-500 to-orange-600 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl hover:shadow-lg hover:shadow-amber-500/25 transition-all">
+              {/* <a href="/organizer/create_event" className="hidden sm:flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-amber-500 to-orange-600 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl hover:shadow-lg hover:shadow-amber-500/25 transition-all">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span className="hidden md:inline">Create Event</span>
                 <span className="md:hidden">New</span>
-              </a>
+              </a> */}
             </div>
           </header>
 
