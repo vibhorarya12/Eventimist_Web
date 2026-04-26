@@ -5,6 +5,7 @@ import { TYPE_META } from "@/components/EventCard";
 import { useOrganizerAuth } from "@/store/eventimist/organizer/auth/AuthState";
 import { useOrganizerLogout } from "@/hooks/eventimist/organizer/sessions/useOrganizerLogout";
 import { useOrganizerEvents } from "@/hooks/eventimist/organizer/event/useOrganizerEvents";
+import { usePublishEvent } from "@/hooks/eventimist/organizer/event/usePublishEvent";
 import type { OrganizerEvent } from "@/services/eventimist/organizer/event/getOrganizerEvents.service";
 
 // ─── Local shape used by UI components ───────────────────────────────────────
@@ -245,14 +246,13 @@ function LogoutModal({ onConfirm, onCancel, dark }: { onConfirm:()=>void; onCanc
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 const PAGE_SIZE = 6; // cards per page
 
-function TabDashboard({ dark }: { dark: boolean }) {
+function TabDashboard({ dark, onPublish }: { dark: boolean; onPublish: (id: string) => void }) {
   const { events: rawEvents, loading, error } = useOrganizerEvents();
   const EVENTS = useMemo(() => rawEvents.map(mapEvent), [rawEvents]);
 
-  const [selectedDay,    setSelectedDay]    = useState<number | null>(null);
-  const [evFilter,       setEvFilter]       = useState<"all"|"live"|"upcoming"|"draft"|"ended">("all");
-  const [page,           setPage]           = useState(1);
-  const [publishEventId, setPublishEventId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [evFilter,    setEvFilter]    = useState<"all"|"live"|"upcoming"|"draft"|"ended">("all");
+  const [page,        setPage]        = useState(1);
 
   const dayEvents = useMemo(() => {
     if (!selectedDay) return [];
@@ -292,7 +292,6 @@ function TabDashboard({ dark }: { dark: boolean }) {
   );
 
   return (
-    <>
     <div className="space-y-5 sm:space-y-7">
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -407,7 +406,7 @@ function TabDashboard({ dark }: { dark: boolean }) {
                         <div className="flex gap-1.5">
                           {ev.status === "draft" && (
                             <button
-                              onClick={() => setPublishEventId(ev.id)}
+                              onClick={() => onPublish(ev.id)}
                               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:shadow-md hover:shadow-amber-400/30 hover:scale-[1.02] transition-all">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12l5 5L20 7"/></svg>
                               Publish
@@ -495,168 +494,6 @@ function TabDashboard({ dark }: { dark: boolean }) {
         </div>
       </div>
     </div>
-
-    {/* ── Publish Modal ── */}
-    {publishEventId && (() => {
-      const raw = rawEvents.find(e => String(e.id) === publishEventId);
-      if (!raw) return null;
-      const allImages = [
-        ...(raw.coverImage ? [raw.coverImage] : []),
-        ...(raw.images ?? []),
-      ].filter((v, i, a) => a.indexOf(v) === i);
-      const fmtDate = (dt: string) => new Date(dt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
-      const fmtTime = (dt: string) => new Date(dt).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true});
-      return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setPublishEventId(null)}/>
-
-          {/* Sheet */}
-          <div className={`relative w-full sm:max-w-md rounded-t-[2rem] sm:rounded-2xl shadow-2xl overflow-hidden
-            ${d(dark,"bg-[#0e1120]","bg-white")} border-t sm:border ${T.border(dark)}`}>
-
-            {/* Mobile drag pill */}
-            <div className="flex justify-center pt-3 sm:hidden">
-              <div className={`w-8 h-1 rounded-full ${d(dark,"bg-white/15","bg-stone-200")}`}/>
-            </div>
-
-            {/* Hero */}
-            <div className="relative h-48 mx-4 mt-4 rounded-2xl overflow-hidden">
-              {allImages[0]
-                ? <img src={allImages[0]} alt={raw.title} className="w-full h-full object-cover"/>
-                : <div className={`w-full h-full ${d(dark,"bg-white/6","bg-stone-100")} flex items-center justify-center`}>
-                    <svg className="w-10 h-10 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  </div>
-              }
-              {/* Gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"/>
-
-              {/* Title over image */}
-              <div className="absolute bottom-0 left-0 right-0 p-4">
-                <div className="inline-flex items-center gap-1.5 bg-amber-500/20 border border-amber-400/30 backdrop-blur-sm rounded-full px-2.5 py-0.5 mb-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"/>
-                  <span className="text-amber-300 text-[9px] font-black tracking-widest uppercase">Draft · Ready to publish</span>
-                </div>
-                <h3 className="text-white font-black text-base leading-snug line-clamp-2"
-                  style={{fontFamily:"'Playfair Display',Georgia,serif"}}>{raw.title}</h3>
-              </div>
-
-              {/* Close */}
-              <button onClick={() => setPublishEventId(null)}
-                className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/40 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/60 flex items-center justify-center transition-all">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-
-              {/* Extra images strip */}
-              {allImages.length > 1 && (
-                <div className="absolute top-3 left-3 flex gap-1">
-                  {allImages.slice(1,4).map((img,i) => (
-                    <img key={i} src={img} alt="" className="w-8 h-8 rounded-lg object-cover border border-white/20 opacity-80"/>
-                  ))}
-                  {allImages.length > 4 && (
-                    <div className="w-8 h-8 rounded-lg bg-black/50 border border-white/20 flex items-center justify-center text-white text-[9px] font-black">+{allImages.length-4}</div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Body */}
-            <div className="p-4 space-y-3 max-h-[45vh] overflow-y-auto">
-
-              {/* Quick stats row */}
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label:"Category", value: raw.category.charAt(0)+raw.category.slice(1).toLowerCase() },
-                  { label:"Mode",     value: raw.mode },
-                  { label:"Capacity", value: raw.capacity.toLocaleString() },
-                ].map(s => (
-                  <div key={s.label} className={`rounded-xl p-2.5 text-center ${d(dark,"bg-white/5","bg-stone-50 border border-stone-100")}`}>
-                    <p className={`${T.text3(dark)} text-[9px] font-bold uppercase tracking-wider mb-0.5`}>{s.label}</p>
-                    <p className={`${T.text1(dark)} text-[11px] font-black`}>{s.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Schedule */}
-              <div className={`rounded-xl p-3 flex items-center gap-3 ${d(dark,"bg-white/5","bg-stone-50 border border-stone-100")}`}>
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${d(dark,"bg-amber-400/15","bg-amber-100")}`}>
-                  <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`${T.text3(dark)} text-[9px] font-bold uppercase tracking-wider`}>Schedule</p>
-                  <p className={`${T.text1(dark)} text-[11px] font-bold`}>{fmtDate(raw.startTime)} · {fmtTime(raw.startTime)} → {fmtTime(raw.endTime)}</p>
-                  <p className={`${T.text3(dark)} text-[9px]`}>{raw.timezone}</p>
-                </div>
-              </div>
-
-              {/* Venue / link */}
-              {(raw.venue || raw.onlineLink) && (
-                <div className={`rounded-xl p-3 flex items-center gap-3 ${d(dark,"bg-white/5","bg-stone-50 border border-stone-100")}`}>
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${d(dark,"bg-amber-400/15","bg-amber-100")}`}>
-                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`${T.text3(dark)} text-[9px] font-bold uppercase tracking-wider`}>{raw.onlineLink ? "Online Link" : "Venue"}</p>
-                    <p className={`${T.text1(dark)} text-[11px] font-bold truncate`}>{raw.venue || raw.onlineLink}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Description */}
-              {raw.description && (
-                <div className={`rounded-xl p-3 ${d(dark,"bg-white/5","bg-stone-50 border border-stone-100")}`}>
-                  <p className={`${T.text3(dark)} text-[9px] font-bold uppercase tracking-wider mb-1.5`}>About this event</p>
-                  <p className={`${T.text2(dark)} text-[11px] leading-relaxed line-clamp-3`}>{raw.description}</p>
-                </div>
-              )}
-
-              {/* Tags */}
-              {raw.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {raw.tags.map(tag => (
-                    <span key={tag} className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full
-                      ${d(dark,"bg-white/6 text-white/50 border border-white/8","bg-stone-100 text-stone-500 border border-stone-200")}`}>
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Footer — sticky CTA */}
-            <div className={`px-4 py-4 border-t ${T.border(dark)} ${d(dark,"bg-[#0e1120]","bg-white")}`}>
-              {/* Warning note */}
-              <div className={`flex items-start gap-2 mb-3 px-3 py-2 rounded-xl ${d(dark,"bg-amber-400/8 border border-amber-400/15","bg-amber-50 border border-amber-200")}`}>
-                <svg className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                <p className={`text-[10px] leading-relaxed ${d(dark,"text-amber-400/80","text-amber-700")}`}>
-                  This event will become visible to all users immediately after publishing.
-                </p>
-              </div>
-
-              <div className="flex gap-2.5">
-                <button onClick={() => setPublishEventId(null)}
-                  className={`flex-none px-4 py-3 rounded-xl text-xs font-bold transition-all border
-                    ${d(dark,"border-white/10 text-white/50 hover:text-white hover:bg-white/6","border-stone-200 text-stone-500 hover:text-stone-800 hover:bg-stone-50")}`}>
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    // TODO: wire publish API
-                    console.log("PUBLISH EVENT →", raw.id);
-                  }}
-                  className="flex-1 py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-500 to-orange-600
-                    hover:shadow-lg hover:shadow-amber-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all
-                    flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12l5 5L20 7"/></svg>
-                  Publish Now
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    })()}
-    </>
   );
 }
 
@@ -852,6 +689,235 @@ function TabSettings({ dark, onToggleDark }: { dark: boolean; onToggleDark: () =
   );
 }
 
+// ─── Publish Modal ────────────────────────────────────────────────────────────
+function PublishModal({ eventId, rawEvents, dark, onClose }: {
+  eventId: string;
+  rawEvents: import("@/services/eventimist/organizer/event/getOrganizerEvents.service").OrganizerEvent[];
+  dark: boolean;
+  onClose: () => void;
+}) {
+  const { publish, loading, error, reset } = usePublishEvent();
+  const [published,   setPublished]   = useState(false);
+  const [imgIdx,      setImgIdx]      = useState(0);
+
+  const raw = rawEvents.find(e => String(e.id) === eventId);
+  if (!raw) return null;
+
+  const allImages = [
+    ...(raw.coverImage ? [raw.coverImage] : []),
+    ...(raw.images ?? []),
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  const prev = () => setImgIdx(i => (i - 1 + allImages.length) % allImages.length);
+  const next = () => setImgIdx(i => (i + 1) % allImages.length);
+
+  const fmtDate = (dt: string) => new Date(dt).toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" });
+  const fmtTime = (dt: string) => new Date(dt).toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit", hour12:true });
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose}/>
+
+      {/* Sheet */}
+      <div className={`relative w-full sm:max-w-md rounded-t-[2rem] sm:rounded-2xl shadow-2xl overflow-hidden
+        ${d(dark,"bg-[#0e1120]","bg-white")} border-t sm:border ${T.border(dark)}`}>
+
+        {/* Mobile pill */}
+        <div className="flex justify-center pt-3 sm:hidden">
+          <div className={`w-8 h-1 rounded-full ${d(dark,"bg-white/15","bg-stone-200")}`}/>
+        </div>
+
+        {/* Image slider */}
+        <div className="relative h-48 mx-4 mt-4 rounded-2xl overflow-hidden flex-shrink-0 group">
+          {allImages.length > 0
+            ? <img
+                key={imgIdx}
+                src={allImages[imgIdx]}
+                alt={raw.title}
+                className="w-full h-full object-cover transition-opacity duration-300"
+              />
+            : <div className={`w-full h-full flex items-center justify-center ${d(dark,"bg-white/6","bg-stone-100")}`}>
+                <svg className="w-10 h-10 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </div>
+          }
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"/>
+
+          {/* Prev / Next buttons */}
+          {allImages.length > 1 && (
+            <>
+              <button onClick={prev}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/70 transition-all">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <button onClick={next}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/70 transition-all">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </>
+          )}
+
+          {/* Dot indicators */}
+          {allImages.length > 1 && (
+            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-1">
+              {allImages.map((_, i) => (
+                <button key={i} onClick={() => setImgIdx(i)}
+                  className={`rounded-full transition-all duration-200 ${i === imgIdx ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/40 hover:bg-white/70"}`}/>
+              ))}
+            </div>
+          )}
+
+          {/* Image counter */}
+          {allImages.length > 1 && (
+            <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm rounded-full px-2 py-0.5 text-white text-[9px] font-black">
+              {imgIdx + 1} / {allImages.length}
+            </div>
+          )}
+
+          {/* Title overlay */}
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div className="inline-flex items-center gap-1.5 bg-amber-500/20 border border-amber-400/30 backdrop-blur-sm rounded-full px-2.5 py-0.5 mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"/>
+              <span className="text-amber-300 text-[9px] font-black tracking-widest uppercase">Draft · Ready to publish</span>
+            </div>
+            <h3 className="text-white font-black text-base leading-snug line-clamp-2"
+              style={{fontFamily:"'Playfair Display',Georgia,serif"}}>{raw.title}</h3>
+          </div>
+
+          {/* Close */}
+          <button onClick={onClose}
+            className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/40 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/60 flex items-center justify-center transition-all">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="p-4 space-y-3 max-h-[38vh] overflow-y-auto">
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label:"Category", value: raw.category.charAt(0)+raw.category.slice(1).toLowerCase() },
+              { label:"Mode",     value: raw.mode },
+              { label:"Capacity", value: raw.capacity.toLocaleString() },
+            ].map(s => (
+              <div key={s.label} className={`rounded-xl p-2.5 text-center ${d(dark,"bg-white/5","bg-stone-50 border border-stone-100")}`}>
+                <p className={`${T.text3(dark)} text-[9px] font-bold uppercase tracking-wider mb-0.5`}>{s.label}</p>
+                <p className={`${T.text1(dark)} text-[11px] font-black`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Schedule */}
+          <div className={`rounded-xl p-3 flex items-center gap-3 ${d(dark,"bg-white/5","bg-stone-50 border border-stone-100")}`}>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${d(dark,"bg-amber-400/15","bg-amber-100")}`}>
+              <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`${T.text3(dark)} text-[9px] font-bold uppercase tracking-wider`}>Schedule</p>
+              <p className={`${T.text1(dark)} text-[11px] font-bold`}>{fmtDate(raw.startTime)} · {fmtTime(raw.startTime)} → {fmtTime(raw.endTime)}</p>
+              <p className={`${T.text3(dark)} text-[9px]`}>{raw.timezone}</p>
+            </div>
+          </div>
+
+          {/* Venue / link */}
+          {(raw.venue || raw.onlineLink) && (
+            <div className={`rounded-xl p-3 flex items-center gap-3 ${d(dark,"bg-white/5","bg-stone-50 border border-stone-100")}`}>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${d(dark,"bg-amber-400/15","bg-amber-100")}`}>
+                <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`${T.text3(dark)} text-[9px] font-bold uppercase tracking-wider`}>{raw.onlineLink ? "Online Link" : "Venue"}</p>
+                <p className={`${T.text1(dark)} text-[11px] font-bold truncate`}>{raw.venue || raw.onlineLink}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Description */}
+          {raw.description && (
+            <div className={`rounded-xl p-3 ${d(dark,"bg-white/5","bg-stone-50 border border-stone-100")}`}>
+              <p className={`${T.text3(dark)} text-[9px] font-bold uppercase tracking-wider mb-1.5`}>About</p>
+              <p className={`${T.text2(dark)} text-[11px] leading-relaxed line-clamp-3`}>{raw.description}</p>
+            </div>
+          )}
+
+          {/* Tags */}
+          {raw.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {raw.tags.map(tag => (
+                <span key={tag} className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full
+                  ${d(dark,"bg-white/6 text-white/50 border border-white/8","bg-stone-100 text-stone-500 border border-stone-200")}`}>
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sticky footer */}
+        <div className={`px-4 pb-5 pt-3 border-t ${T.border(dark)}`}>
+
+          {/* Success state */}
+          {published ? (
+            <div className="flex flex-col items-center gap-3 py-2">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-400/25">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+              </div>
+              <p className={`${T.text1(dark)} font-black text-sm`}>Published successfully!</p>
+              <button onClick={onClose}
+                className="w-full py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-emerald-500 to-teal-500 transition-all">
+                Done
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* API error */}
+              {error && (
+                <div className="flex items-start gap-2 mb-3 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                  <svg className="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <p className="text-[10px] leading-relaxed text-rose-400">{error}</p>
+                </div>
+              )}
+
+              {/* Warning */}
+              <div className={`flex items-start gap-2 mb-3 px-3 py-2 rounded-xl ${d(dark,"bg-amber-400/8 border border-amber-400/15","bg-amber-50 border border-amber-200")}`}>
+                <svg className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <p className={`text-[10px] leading-relaxed ${d(dark,"text-amber-400/80","text-amber-700")}`}>
+                  This event becomes visible to all users immediately after publishing.
+                </p>
+              </div>
+
+              <div className="flex gap-2.5">
+                <button onClick={onClose} disabled={loading}
+                  className={`flex-none px-4 py-3 rounded-xl text-xs font-bold transition-all border disabled:opacity-40
+                    ${d(dark,"border-white/10 text-white/50 hover:text-white hover:bg-white/6","border-stone-200 text-stone-500 hover:text-stone-800 hover:bg-stone-50")}`}>
+                  Cancel
+                </button>
+                <button
+                  disabled={loading}
+                  onClick={async () => {
+                    reset();
+                    const result = await publish(raw.id);
+                    if (result) setPublished(true);
+                  }}
+                  className="flex-1 py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-500 to-orange-600
+                    hover:shadow-lg hover:shadow-amber-500/25 hover:scale-[1.01] active:scale-[0.99]
+                    disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 transition-all
+                    flex items-center justify-center gap-2">
+                  {loading ? (
+                    <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Publishing…</>
+                  ) : (
+                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12l5 5L20 7"/></svg>Publish Now</>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -865,9 +931,10 @@ export default function OrganizerDashboard() {
   const { events: rawEvents } = useOrganizerEvents();
   const EVENTS = useMemo(() => rawEvents.map(mapEvent), [rawEvents]);
 
-  const [dark, setDark]           = useState(false);
-  const [activeTab, setActiveTab] = useState<NavTab>("dashboard");
-  const [sideOpen, setSideOpen]   = useState(false);
+  const [dark, setDark]               = useState(false);
+  const [activeTab, setActiveTab]     = useState<NavTab>("dashboard");
+  const [sideOpen, setSideOpen]       = useState(false);
+  const [publishEventId, setPublishEventId] = useState<string | null>(null);
   const [logoutModal, setLogoutModal] = useState(false);
 
   useEffect(() => {
@@ -984,6 +1051,15 @@ export default function OrganizerDashboard() {
 
       {logoutModal && <LogoutModal onConfirm={() => { setLogoutModal(false); logout(); }} onCancel={() => setLogoutModal(false)} dark={dark}/>}
 
+      {publishEventId && (
+        <PublishModal
+          eventId={publishEventId}
+          rawEvents={rawEvents}
+          dark={dark}
+          onClose={() => setPublishEventId(null)}
+        />
+      )}
+
       <div className={`flex min-h-screen ${T.bg(dark)} transition-colors duration-300`}>
 
         {/* ── Desktop Sidebar ── */}
@@ -1072,7 +1148,7 @@ export default function OrganizerDashboard() {
           {/* ── Content ── */}
           <main className="flex-1 px-4 sm:px-5 py-5 sm:py-7 overflow-y-auto pb-20 lg:pb-7">
             <div key={activeTab as string} className="tab-enter">
-              {activeTab === "dashboard" && <TabDashboard dark={dark}/>}
+              {activeTab === "dashboard" && <TabDashboard dark={dark} onPublish={setPublishEventId}/>}
               {activeTab === "audience"  && <TabAudience  dark={dark}/>}
               {activeTab === "revenue"   && <TabRevenue   dark={dark}/>}
               {activeTab === "analytics" && <TabAnalytics dark={dark}/>}
