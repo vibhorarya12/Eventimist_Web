@@ -412,7 +412,7 @@ function TabDashboard({ dark, onPublish }: { dark: boolean; onPublish: (id: stri
                               Publish
                             </button>
                           )}
-                          <a href={`/events/${ev.id}`} className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 border border-gray-200")} flex items-center justify-center transition-all`}>
+                          <a href={`/organizer/preview-event/${ev.id}`} className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 border border-gray-200")} flex items-center justify-center transition-all`}>
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                           </a>
                           <a href={`/organizer/update-event/${ev.id}`} className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 border border-gray-200")} flex items-center justify-center transition-all`}>
