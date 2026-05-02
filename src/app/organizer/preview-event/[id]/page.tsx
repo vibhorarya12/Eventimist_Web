@@ -38,7 +38,7 @@ function ImageSlider({ images, title }: { images: string[]; title: string }) {
   if (images.length === 0) return null;
 
   return (
-    <div className="relative w-full aspect-[16/7] sm:aspect-[16/6] overflow-hidden bg-stone-900 group">
+    <div className="relative w-full h-52 sm:h-64 overflow-hidden bg-stone-900 group rounded-none">
       {images.map((src, i) => (
         <img key={i} src={src} alt={`${title} ${i+1}`}
           className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-in-out
@@ -204,8 +204,12 @@ export default function PreviewEventPage() {
         </div>
       </div>
 
-      {/* ── Hero image slider ── */}
-      <ImageSlider images={allImages} title={ev.title}/>
+      {/* ── Hero image slider — constrained + rounded ── */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6">
+        <div className="rounded-2xl overflow-hidden">
+          <ImageSlider images={allImages} title={ev.title}/>
+        </div>
+      </div>
 
       {/* ── Content ── */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
