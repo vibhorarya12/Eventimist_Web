@@ -404,15 +404,26 @@ function TabDashboard({ dark, onPublish }: { dark: boolean; onPublish: (id: stri
                       <div className="flex items-center justify-between">
                         <span className={`${T.text2(dark)} text-xs font-bold`}>{ev.revenue ? fmt(ev.revenue) : "Free"}</span>
                         <div className="flex gap-1.5">
-                          {ev.status === "draft" && (
-                            <button
-                              onClick={() => onPublish(ev.id)}
-                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:shadow-md hover:shadow-amber-400/30 hover:scale-[1.02] transition-all">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12l5 5L20 7"/></svg>
-                              Publish
-                            </button>
-                          )}
-                          <a href={`/organizer/preview-event/${ev.id}`} className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 border border-gray-200")} flex items-center justify-center transition-all`}>
+                          {ev.status === "draft" && (() => {
+                            const hoursLeft = (new Date(rawEvents.find(r=>String(r.id)===ev.id)?.startTime??0).getTime() - Date.now()) / 3600000;
+                            const canPublish = hoursLeft >= 48;
+                            return (
+                              <button
+                                onClick={() => onPublish(ev.id)}
+                                title={canPublish ? "Publish event" : `Start time must be ≥ 48h from now (${Math.max(0,Math.ceil(hoursLeft))}h remaining)`}
+                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black transition-all
+                                  ${canPublish
+                                    ? "text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:shadow-md hover:shadow-amber-400/30 hover:scale-[1.02] ring-1 ring-amber-400/60 ring-offset-1 ring-offset-transparent animate-pulse-ring"
+                                    : d(dark,"text-white/30 bg-white/6 border border-white/10 cursor-not-allowed","text-stone-400 bg-stone-100 border border-stone-200 cursor-not-allowed")
+                                  }`}>
+                                {canPublish
+                                  ? <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12l5 5L20 7"/></svg>Publish</>
+                                  : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>~{Math.max(0,Math.ceil(hoursLeft))}h</>
+                                }
+                              </button>
+                            );
+                          })()}
+                          <a href={`/events/${ev.id}`} className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 border border-gray-200")} flex items-center justify-center transition-all`}>
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                           </a>
                           <a href={`/organizer/update-event/${ev.id}`} className={`w-7 h-7 rounded-lg ${d(dark,"bg-white/6 text-white/40 hover:text-white hover:bg-white/12","bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900 border border-gray-200")} flex items-center justify-center transition-all`}>
@@ -714,6 +725,11 @@ function PublishModal({ eventId, rawEvents, dark, onClose }: {
   const fmtDate = (dt: string) => new Date(dt).toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" });
   const fmtTime = (dt: string) => new Date(dt).toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit", hour12:true });
 
+  const hoursUntilStart = (new Date(raw.startTime).getTime() - Date.now()) / 3600000;
+  const canPublish      = hoursUntilStart >= 48;
+  const hoursLeft       = Math.max(0, Math.ceil(hoursUntilStart));
+  const minsLeft        = Math.max(0, Math.ceil((hoursUntilStart * 60) % 60));
+
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
       {/* Backdrop */}
@@ -878,13 +894,22 @@ function PublishModal({ eventId, rawEvents, dark, onClose }: {
                 </div>
               )}
 
-              {/* Warning */}
-              <div className={`flex items-start gap-2 mb-3 px-3 py-2 rounded-xl ${d(dark,"bg-amber-400/8 border border-amber-400/15","bg-amber-50 border border-amber-200")}`}>
-                <svg className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                <p className={`text-[10px] leading-relaxed ${d(dark,"text-amber-400/80","text-amber-700")}`}>
-                  This event becomes visible to all users immediately after publishing.
-                </p>
-              </div>
+              {/* 48h warning or standard warning */}
+              {!canPublish ? (
+                <div className="flex items-start gap-2 mb-3 px-3 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                  <svg className="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <p className="text-[10px] leading-relaxed text-rose-400">
+                    Event must start at least <strong>48 hours from now</strong>. Currently {hoursLeft}h {minsLeft > 0 ? `${minsLeft}m ` : ""}away — update the start time to enable publishing.
+                  </p>
+                </div>
+              ) : (
+                <div className={`flex items-start gap-2 mb-3 px-3 py-2 rounded-xl ${d(dark,"bg-amber-400/8 border border-amber-400/15","bg-amber-50 border border-amber-200")}`}>
+                  <svg className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                  <p className={`text-[10px] leading-relaxed ${d(dark,"text-amber-400/80","text-amber-700")}`}>
+                    This event becomes visible to all users immediately after publishing.
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-2.5">
                 <button onClick={onClose} disabled={loading}
@@ -893,18 +918,21 @@ function PublishModal({ eventId, rawEvents, dark, onClose }: {
                   Cancel
                 </button>
                 <button
-                  disabled={loading}
+                  disabled={loading || !canPublish}
                   onClick={async () => {
                     reset();
                     const result = await publish(raw.id);
                     if (result) setPublished(true);
                   }}
-                  className="flex-1 py-3 rounded-xl font-black text-sm text-white bg-gradient-to-r from-amber-500 to-orange-600
-                    hover:shadow-lg hover:shadow-amber-500/25 hover:scale-[1.01] active:scale-[0.99]
-                    disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 transition-all
-                    flex items-center justify-center gap-2">
+                  className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2
+                    ${canPublish
+                      ? "text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:shadow-lg hover:shadow-amber-500/25 hover:scale-[1.01] active:scale-[0.99]"
+                      : d(dark,"text-white/20 bg-white/6 border border-white/8 cursor-not-allowed","text-stone-400 bg-stone-100 border border-stone-200 cursor-not-allowed")
+                    } disabled:scale-100`}>
                   {loading ? (
                     <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Publishing…</>
+                  ) : !canPublish ? (
+                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Locked — {hoursLeft}h to go</>
                   ) : (
                     <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12l5 5L20 7"/></svg>Publish Now</>
                   )}

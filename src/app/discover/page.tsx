@@ -5,6 +5,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EventCard, MapPopupCard, TYPE_META } from "@/components/EventCard";
 import type { Event } from "@/components/EventCard";
+import { QueryProvider } from "@/components/QueryProvider";
+import { useDiscoverEvents } from "@/hooks/eventimist/user/events/useDiscoverEvents";
+import type { DiscoverEvent } from "@/services/eventimist/user/events/discoverEvents.service";
 
 // ─── All 15 categories ────────────────────────────────────────────────────────
 const CATEGORIES: { value: string; label: string; emoji: string; hex: string }[] = [
@@ -52,6 +55,27 @@ const DUMMY_EVENTS: Event[] = [
   { id:"14", title:"Bollywood Night Live",               type:"Entertainment", description:"Live band, dance performances, stand-up comedy, DJ set to close. 5-hour extravaganza.",       date:"2026-10-18T19:00:00", venue:"Jawaharlal Nehru Stadium",        tags:["Bollywood","Dance","Comedy"],     image_url:"https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80", attendance:8000,  organizerName:"ShowTime India",      organizer:"showtime",       organizerProfilepic:"https://i.pravatar.cc/40?img=27", latitude:28.5820, longitude:77.2365, organizerId:"org14" },
   { id:"15", title:"IndiaGameCon 2026",                  type:"Gaming",        description:"India's largest gaming convention. 200 playable titles, esports finals, dev panels.",          date:"2026-10-25T10:00:00", venue:"NSIC Exhibition Ground, Delhi",   tags:["Esports","Indie","Console"],      image_url:"https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=80", attendance:12000, organizerName:"GameOn India",        organizer:"gameon",         organizerProfilepic:"https://i.pravatar.cc/40?img=28", latitude:28.5245, longitude:77.1855, organizerId:"org15" },
 ];
+
+// ─── Map API response → EventCard's Event shape ───────────────────────────────
+function mapDiscoverEvent(e: DiscoverEvent): Event {
+  return {
+    id:                  String(e.id),
+    title:               e.title,
+    description:         e.description,
+    type:                e.category.charAt(0) + e.category.slice(1).toLowerCase(),
+    date:                e.startTime,
+    venue:               e.venue || (e.mode === "ONLINE" ? "Online" : ""),
+    tags:                [],
+    image_url:           e.coverImage,
+    attendance:          0,
+    organizerName:       e.organizerName,
+    organizer:           e.organizerName.toLowerCase().replace(/\s+/g, ""),
+    organizerProfilepic: e.organizerImage,
+    latitude:            e.latitude,
+    longitude:           e.longitude,
+    organizerId:         String(e.id),
+  };
+}
 
 // ─── Map styles ───────────────────────────────────────────────────────────────
 const DARK_STYLES = [
@@ -133,6 +157,14 @@ function Nav({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DiscoverPage() {
+  return (
+    <QueryProvider>
+      <DiscoverPageInner/>
+    </QueryProvider>
+  );
+}
+
+function DiscoverPageInner() {
   const [dark,        setDark]        = useState(true);
   const [query,       setQuery]       = useState("");
   const [activeType,  setActiveType]  = useState("All");
@@ -141,10 +173,30 @@ export default function DiscoverPage() {
   const [mapReady,    setMapReady]    = useState(false);
   const [sortBy,      setSortBy]      = useState<"date"|"attendance">("date");
 
+  // ── Real events from API ────────────────────────────────────────────────────
+  const {
+    events:         rawEvents,
+    loading:        eventsLoading,
+    error:          eventsError,
+    geoLoading,
+    geoError,
+    locationGranted,
+    coords,
+    radius,
+    setRadius,
+  } = useDiscoverEvents(10);
+
+  // Map API events → EventCard shape
+  const allEvents: Event[] = rawEvents.map(mapDiscoverEvent);
+
   const mapDivRef  = useRef<HTMLDivElement>(null);
   const mapObjRef  = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
-  const MAP_CENTER = { lat: 28.6139, lng: 77.2090 };
+
+  // Centre map on user's location or fallback Pune
+  const MAP_CENTER = coords
+    ? { lat: coords.latitude, lng: coords.longitude }
+    : { lat: 18.5204, lng: 73.8567 };
 
   // ── Theme tokens ────────────────────────────────────────────────────────────
   const bgPage  = dark ? "#0d0f17"  : "#f5f5f4";
@@ -161,12 +213,12 @@ export default function DiscoverPage() {
   const statBg  = dark ? "bg-[#13151f]/90 border-white/8"  : "bg-white/95 border-stone-200";
 
   // ── Filter + sort ──────────────────────────────────────────────────────────
-  const filtered = DUMMY_EVENTS.filter(e => {
+  const filtered = allEvents.filter(e => {
     const matchType  = activeType === "All" || e.type === activeType;
-    const matchQuery = !query || [e.title,e.description,e.venue,...e.tags,e.organizerName]
+    const matchQuery = !query || [e.title, e.description, e.venue, ...e.tags, e.organizerName]
       .join(" ").toLowerCase().includes(query.toLowerCase());
     return matchType && matchQuery;
-  }).sort((a,b) => sortBy === "attendance"
+  }).sort((a, b) => sortBy === "attendance"
     ? b.attendance - a.attendance
     : new Date(a.date).getTime() - new Date(b.date).getTime()
   );
@@ -222,7 +274,7 @@ export default function DiscoverPage() {
       });
       marker.addListener("mouseover", () => marker.setIcon(makeSvgIcon(color, true)));
       marker.addListener("mouseout",  () => { if (activeEvent?.id !== event.id) marker.setIcon(makeSvgIcon(color, false)); });
-      marker.addListener("click",     () => setActiveEvent(p => p?.id === event.id ? null : event));
+      marker.addListener("click",     () => setActiveEvent(p => (p?.id === event.id ? null : event) as Event | null));
       markersRef.current.set(event.id, marker);
     });
   }, [filtered, mapReady, activeEvent]);
@@ -265,6 +317,23 @@ export default function DiscoverPage() {
 
       <div className="h-screen w-screen flex flex-col overflow-hidden transition-colors duration-300"
         style={{ background: bgPage }}>
+
+        {/* ── Geo loading screen — shown while waiting for location ── */}
+        {geoLoading && (
+          <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center gap-4"
+            style={{ background: bgPage }}>
+            <div className="w-16 h-16 rounded-2xl bg-amber-400/15 flex items-center justify-center map-pulse">
+              <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/>
+              </svg>
+            </div>
+            <p className={`font-black text-sm ${t1}`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>
+              Getting your location…
+            </p>
+            <p className={`text-xs ${t3}`}>Finding events near you</p>
+          </div>
+        )}
 
         <Nav dark={dark} onToggle={() => setDark(d => !d)}/>
 
@@ -353,6 +422,43 @@ export default function DiscoverPage() {
                   );
                 })}
               </div>
+
+              {/* Geo status + radius slider */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Location badge */}
+                <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0
+                  ${locationGranted
+                    ? dark ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-400" : "border-emerald-300 bg-emerald-50 text-emerald-700"
+                    : dark ? "border-white/10 bg-white/5 text-white/30" : "border-stone-200 bg-stone-100 text-stone-400"
+                  }`}>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  {locationGranted ? "Using your location" : "Using Pune (default)"}
+                </div>
+
+                {/* API loading indicator */}
+                {eventsLoading && (
+                  <div className={`flex items-center gap-1.5 text-[10px] font-bold ${t3}`}>
+                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    Searching…
+                  </div>
+                )}
+
+                {/* Radius slider */}
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className={`text-[10px] font-bold flex-shrink-0 ${t3}`}>Radius</span>
+                  <input
+                    type="range" min="1" max="100" step="1" value={radius}
+                    onChange={e => setRadius(Number(e.target.value))}
+                    className="w-24 accent-amber-500 cursor-pointer"
+                  />
+                  <span className={`text-[10px] font-black w-10 flex-shrink-0 ${t2}`}>{radius} km</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -383,7 +489,21 @@ export default function DiscoverPage() {
                   ? "grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start"
                   : "space-y-3"
               }`}>
-                {filtered.length === 0 ? (
+                {eventsLoading && filtered.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-center col-span-full">
+                    <svg className="w-8 h-8 animate-spin text-amber-500 mb-3" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    <p className={`text-sm font-bold ${t2}`}>Finding events near you…</p>
+                  </div>
+                ) : eventsError ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-center col-span-full">
+                    <div className="text-3xl mb-3">⚠️</div>
+                    <p className={`font-bold text-sm mb-1 ${t1}`}>Failed to load events</p>
+                    <p className={`text-xs mb-4 ${t3}`}>{eventsError}</p>
+                  </div>
+                ) : filtered.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-24 text-center col-span-full">
                     <div className="text-4xl mb-3">🔍</div>
                     <p className={`font-bold text-sm mb-1 ${t1}`}>No events found</p>
@@ -399,7 +519,7 @@ export default function DiscoverPage() {
                       <EventCard
                         event={event}
                         active={activeEvent?.id === event.id}
-                        onClick={() => setActiveEvent(p => p?.id === event.id ? null : event)}
+                        onClick={() => setActiveEvent(p => (p?.id === event.id ? null : event) as Event | null)}
                       />
                     </div>
                   ))
