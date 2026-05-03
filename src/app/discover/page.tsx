@@ -80,20 +80,29 @@ function mapDiscoverEvent(e: DiscoverEvent): Event {
 // ─── Map styles ───────────────────────────────────────────────────────────────
 const DARK_STYLES = [
   { elementType:"geometry",                stylers:[{color:"#0d0f17"}] },
-  { elementType:"labels.text.stroke",      stylers:[{color:"#0d0f17"}] },
-  { elementType:"labels.text.fill",        stylers:[{color:"#3d4966"}] },
-  { featureType:"administrative",          elementType:"geometry",         stylers:[{color:"#1a2035"}] },
-  { featureType:"administrative.locality", elementType:"labels.text.fill", stylers:[{color:"#6b7a99"}] },
+  { elementType:"labels",                  stylers:[{visibility:"off"}] },
+  { featureType:"administrative.locality", elementType:"labels.text.fill", stylers:[{color:"#3d4966"},{visibility:"on"}] },
+  { featureType:"administrative.country",  elementType:"labels.text.fill", stylers:[{color:"#2a3355"},{visibility:"on"}] },
   { featureType:"poi",                     stylers:[{visibility:"off"}] },
-  { featureType:"road",                    elementType:"geometry",         stylers:[{color:"#1e2440"}] },
-  { featureType:"road",                    elementType:"geometry.stroke",  stylers:[{color:"#0d0f17"}] },
-  { featureType:"road",                    elementType:"labels.text.fill", stylers:[{color:"#374160"}] },
-  { featureType:"road.highway",            elementType:"geometry",         stylers:[{color:"#263052"}] },
-  { featureType:"road.highway",            elementType:"geometry.stroke",  stylers:[{color:"#1a2035"}] },
-  { featureType:"road.highway",            elementType:"labels.text.fill", stylers:[{color:"#4a5878"}] },
   { featureType:"transit",                 stylers:[{visibility:"off"}] },
-  { featureType:"water",                   elementType:"geometry",         stylers:[{color:"#080b14"}] },
-  { featureType:"water",                   elementType:"labels.text.fill", stylers:[{color:"#1a2035"}] },
+  { featureType:"road",                    elementType:"geometry",         stylers:[{color:"#161926"}] },
+  { featureType:"road.highway",            elementType:"geometry",         stylers:[{color:"#1e2440"}] },
+  { featureType:"road.arterial",           elementType:"geometry",         stylers:[{color:"#141620"}] },
+  { featureType:"road.local",              stylers:[{visibility:"off"}] },
+  { featureType:"water",                   elementType:"geometry",         stylers:[{color:"#060911"}] },
+  { featureType:"landscape",               elementType:"geometry",         stylers:[{color:"#0a0c15"}] },
+];
+
+const LIGHT_STYLES = [
+  { elementType:"labels",                  stylers:[{visibility:"off"}] },
+  { featureType:"administrative.locality", elementType:"labels.text.fill", stylers:[{color:"#9ca3af"},{visibility:"on"}] },
+  { featureType:"poi",                     stylers:[{visibility:"off"}] },
+  { featureType:"transit",                 stylers:[{visibility:"off"}] },
+  { featureType:"road",                    elementType:"geometry",         stylers:[{color:"#e5e7eb"}] },
+  { featureType:"road.highway",            elementType:"geometry",         stylers:[{color:"#d1d5db"}] },
+  { featureType:"road.local",              stylers:[{visibility:"off"}] },
+  { featureType:"water",                   elementType:"geometry",         stylers:[{color:"#bfdbfe"}] },
+  { featureType:"landscape",               elementType:"geometry",         stylers:[{color:"#f9fafb"}] },
 ];
 
 function makeSvgIcon(color: string, active: boolean) {
@@ -233,7 +242,7 @@ function DiscoverPageInner() {
     if (!mapDivRef.current) return;
     const map = new (window as any).google.maps.Map(mapDivRef.current, {
       center: MAP_CENTER, zoom: 12, disableDefaultUI: true, gestureHandling: "greedy",
-      styles: dark ? DARK_STYLES : [],
+      styles: dark ? DARK_STYLES : LIGHT_STYLES,
     });
     mapObjRef.current = map;
     setMapReady(true);
@@ -252,7 +261,7 @@ function DiscoverPageInner() {
   }, [bootMap]);
 
   useEffect(() => {
-    mapObjRef.current?.setOptions({ styles: dark ? DARK_STYLES : [] });
+    mapObjRef.current?.setOptions({ styles: dark ? DARK_STYLES : LIGHT_STYLES });
   }, [dark]);
 
   useEffect(() => {
@@ -518,6 +527,7 @@ function DiscoverPageInner() {
                     <div key={event.id} className="fade-card" style={{ animationDelay: `${Math.min(i*25,250)}ms` }}>
                       <EventCard
                         event={event}
+                        dark={dark}
                         active={activeEvent?.id === event.id}
                         onClick={() => setActiveEvent(p => (p?.id === event.id ? null : event) as Event | null)}
                       />
@@ -548,7 +558,7 @@ function DiscoverPageInner() {
 
               {activeEvent && mapReady && (
                 <div className="absolute bottom-5 left-1/2 z-30 popup-enter" style={{ transform:"translateX(-50%)" }}>
-                  <MapPopupCard event={activeEvent} onClose={() => setActiveEvent(null)}/>
+                  <MapPopupCard event={activeEvent} dark={dark} onClose={() => setActiveEvent(null)}/>
                 </div>
               )}
 
