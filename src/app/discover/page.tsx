@@ -8,6 +8,8 @@ import type { Event } from "@/components/EventCard";
 import { QueryProvider } from "@/components/QueryProvider";
 import { useDiscoverEvents } from "@/hooks/eventimist/user/events/useDiscoverEvents";
 import type { DiscoverEvent } from "@/services/eventimist/user/events/discoverEvents.service";
+import { useUserAuth } from "@/store/eventimist/user/auth/UserAuthState";
+import { useUserLogout } from "@/hooks/eventimist/user/sessions/useUserLogout";
 
 // ─── All 15 categories ────────────────────────────────────────────────────────
 const CATEGORIES: { value: string; label: string; emoji: string; hex: string }[] = [
@@ -121,8 +123,79 @@ function makeSvgIcon(color: string, active: boolean) {
   };
 }
 
+// ─── User avatar dropdown ─────────────────────────────────────────────────────
+function UserMenu({ dark }: { dark: boolean }) {
+  const [open, setOpen] = useState(false);
+  const name       = useUserAuth(s => s.name);
+  const profilePic = useUserAuth(s => s.profilePic);
+  const { logout } = useUserLogout();
+  const ref        = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const initials = name.trim().split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border transition-all hover:scale-[1.02]
+          border-amber-400/40 bg-amber-400/10 hover:bg-amber-400/15">
+        {/* Avatar */}
+        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-[11px] font-black">
+          {profilePic
+            ? <img src={profilePic} alt={name} className="w-full h-full object-cover"/>
+            : initials
+          }
+        </div>
+        <span className={`text-xs font-bold max-w-[80px] truncate ${dark ? "text-white/80" : "text-stone-700"}`}>
+          {name.split(" ")[0]}
+        </span>
+        <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""} ${dark ? "text-white/40" : "text-stone-400"}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className={`absolute right-0 top-full mt-2 w-52 rounded-2xl border shadow-xl overflow-hidden z-50
+          ${dark ? "bg-[#13151f] border-white/8" : "bg-white border-stone-200"}`}>
+          {/* Profile header */}
+          <div className={`px-4 py-3 border-b ${dark ? "border-white/8" : "border-stone-100"}`}>
+            <p className={`text-xs font-black truncate ${dark ? "text-white" : "text-stone-900"}`}>{name}</p>
+          </div>
+          {/* Actions */}
+          <div className="p-1.5">
+            <a href="/user/profile"
+              className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-xs font-semibold transition-all
+                ${dark ? "text-white/60 hover:text-white hover:bg-white/8" : "text-stone-600 hover:text-stone-900 hover:bg-stone-50"}`}>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              My Profile
+            </a>
+            <button onClick={() => { setOpen(false); logout(); }}
+              className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left
+                ${dark ? "text-rose-400 hover:bg-rose-400/10" : "text-rose-500 hover:bg-rose-50"}`}>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Nav ──────────────────────────────────────────────────────────────────────
 function Nav({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
+  const isLoggedIn  = useUserAuth(s => s.isAuthenticated());
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const bg   = dark ? "bg-[#0d0f17]/97 border-white/6"  : "bg-white/97 border-stone-200";
   const logo = dark ? "text-white"   : "text-stone-900";
   const link = dark ? "text-white/40 hover:text-white/80 hover:bg-white/5"
@@ -154,10 +227,17 @@ function Nav({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
             title={dark ? "Light mode" : "Dark mode"}>
             {dark ? "☀️" : "🌙"}
           </button>
-          <a href="/user" className={`text-sm hidden sm:block font-medium px-3 py-1.5 rounded-xl transition-all ${link}`}>Sign In</a>
-          <a href="/user" className="text-sm font-black bg-gradient-to-r from-amber-400 to-orange-500 text-white px-4 py-2 rounded-xl hover:shadow-lg hover:shadow-amber-400/30 hover:scale-[1.02] transition-all">
-            Get Started
-          </a>
+          {/* Only render auth UI after client mount to avoid hydration mismatch */}
+          {mounted && isLoggedIn ? (
+            <UserMenu dark={dark}/>
+          ) : (
+            <>
+              <a href="/user" className={`text-sm hidden sm:block font-medium px-3 py-1.5 rounded-xl transition-all ${link}`}>Sign In</a>
+              <a href="/user" className="text-sm font-black bg-gradient-to-r from-amber-400 to-orange-500 text-white px-4 py-2 rounded-xl hover:shadow-lg hover:shadow-amber-400/30 hover:scale-[1.02] transition-all">
+                Get Started
+              </a>
+            </>
+          )}
         </div>
       </div>
     </nav>
