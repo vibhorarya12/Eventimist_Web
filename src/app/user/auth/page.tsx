@@ -1,15 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useUserLogin } from "@/hooks/eventimist/user/auth/useUserLogin";
+import { useUserLogin }  from "@/hooks/eventimist/user/auth/useUserLogin";
+import { useUserSignup } from "@/hooks/eventimist/user/auth/useUserSignup";
 
 // ─── Carousel slides (user/discover theme) ───────────────────────────────────
 const USER_SLIDES = [
-  { url:"https://images.pexels.com/photos/16984153/pexels-photo-16984153.jpeg", label:"Live Events",       stat:"47 events happening near you right now" },
-  { url:"https://images.pexels.com/photos/34774354/pexels-photo-34774354.jpeg", label:"Tech Meetups",      stat:"Join 4,200+ developers at local summits" },
-  { url:"https://images.pexels.com/photos/36027863/pexels-photo-36027863.jpeg", label:"Food Experiences",  stat:"Curated food trails across 40+ cities" },
+  { url:"https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=80", label:"Live Events",       stat:"47 events happening near you right now" },
+  { url:"https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80", label:"Tech Meetups",      stat:"Join 4,200+ developers at local summits" },
+  { url:"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80", label:"Food Experiences",  stat:"Curated food trails across 40+ cities" },
   { url:"https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=1200&q=80", label:"Volunteer Drives",   stat:"490 volunteers joined this month" },
-  { url:"https://images.pexels.com/photos/36370811/pexels-photo-36370811.jpeg", label:"Health & Fitness",  stat:"3,200 runners at the last community run" },
+  { url:"https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1200&q=80", label:"Health & Fitness",  stat:"3,200 runners at the last community run" },
 ];
 
 // ─── Left carousel ────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ function PanelCarousel() {
       </div>
 
       {/* Testimonial card */}
-      {/* <div className="absolute top-1/2 -translate-y-1/2 left-8 right-8 z-10">
+      <div className="absolute top-1/2 -translate-y-1/2 left-8 right-8 z-10">
         <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-5 max-w-xs">
           <div className="flex items-center gap-1 mb-2">
             {[1,2,3,4,5].map(i => <span key={i} className="text-amber-400 text-xs">★</span>)}
@@ -73,7 +74,7 @@ function PanelCarousel() {
             </div>
           </div>
         </div>
-      </div> */}
+      </div>
 
       {/* Bottom content */}
       <div className="absolute bottom-0 left-0 right-0 z-10 p-10">
@@ -173,6 +174,43 @@ function GoogleButton() {
   );
 }
 
+// ─── 6-digit OTP input ────────────────────────────────────────────────────────
+function OtpInput({ onComplete, disabled }: { onComplete:(code:string)=>void; disabled:boolean }) {
+  const [digits, setDigits] = useState(["","","","","",""]);
+  const inputs = useRef<(HTMLInputElement|null)[]>([]);
+
+  const update = (idx: number, val: string) => {
+    if (val.length === 6 && /^\d{6}$/.test(val)) {
+      const arr = val.split(""); setDigits(arr);
+      inputs.current[5]?.focus(); onComplete(val); return;
+    }
+    const digit = val.replace(/\D/g,"").slice(-1);
+    const next  = [...digits]; next[idx] = digit; setDigits(next);
+    if (digit && idx < 5) inputs.current[idx+1]?.focus();
+    if (next.every(d => d !== "")) onComplete(next.join(""));
+  };
+
+  const onKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !digits[idx] && idx > 0) inputs.current[idx-1]?.focus();
+  };
+
+  return (
+    <div className="flex gap-2.5 justify-center">
+      {digits.map((d, i) => (
+        <input key={i} ref={el => { inputs.current[i] = el; }}
+          value={d} disabled={disabled} maxLength={6} inputMode="numeric"
+          onChange={e => update(i, e.target.value)}
+          onKeyDown={e => onKeyDown(i, e)}
+          onFocus={e => e.target.select()}
+          className={`w-11 h-14 text-center text-xl font-black border-2 rounded-2xl outline-none transition-all
+            ${d ? "border-amber-400 bg-amber-50 text-stone-900" : "border-stone-200 bg-stone-50 text-stone-800"}
+            focus:border-amber-400 focus:bg-amber-50 disabled:opacity-40`}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ─── Auth Panel ────────────────────────────────────────────────────────────────
 function AuthPanel() {
   const [tab, setTab] = useState<Tab>("signin");
@@ -180,6 +218,16 @@ function AuthPanel() {
 
   // ── Login hook (redirects to /discover on success) ─────────────────────────
   const { login, loading, error, reset } = useUserLogin("/discover");
+
+  // ── Signup hook (Clerk OTP → backend register → /discover) ────────────────
+  const signup = useUserSignup("/discover");
+  const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const t = setTimeout(() => setResendTimer(r => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendTimer]);
 
   // Sign-in state
   const [siEmail, setSiEmail] = useState("");
@@ -225,12 +273,76 @@ function AuthPanel() {
 
     if (tab === "signin") {
       await login({ email: siEmail, password: siPass });
-      // useUserLogin redirects to /discover on success — no setDone needed
     } else {
-      // Signup not yet wired — show success screen as before
-      setDone(true);
+      // Step 1: send OTP
+      await signup.submitForm(name, suEmail, suPass);
+      if (!signup.sendError) setResendTimer(60);
     }
   };
+
+  // ── OTP verification screen (signup step 2) ────────────────────────────────
+  if (tab === "signup" && signup.step === "otp") {
+    return (
+      <div className="flex flex-col items-center justify-center h-full px-8 text-center">
+        {/* Icon */}
+        <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mb-5">
+          <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </div>
+        <h3 className="text-stone-900 text-2xl font-black mb-1"
+          style={{fontFamily:"'Playfair Display',Georgia,serif"}}>Check your inbox</h3>
+        <p className="text-stone-400 text-sm mb-7 max-w-xs">
+          We sent a 6-digit code to <span className="font-bold text-stone-600">{suEmail}</span>. Enter it below to verify your email.
+        </p>
+
+        <OtpInput
+          onComplete={signup.verifyOtp}
+          disabled={signup.verifyLoading}
+        />
+
+        {/* Verify error */}
+        {signup.verifyError && (
+          <div className="mt-4 flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-600 text-xs px-4 py-3 rounded-xl w-full">
+            <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            {signup.verifyError}
+          </div>
+        )}
+
+        {/* Verifying spinner */}
+        {signup.verifyLoading && (
+          <div className="mt-5 flex items-center gap-2 text-stone-400 text-sm">
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            Verifying…
+          </div>
+        )}
+
+        {/* Resend */}
+        <div className="mt-6 flex items-center gap-2 text-sm">
+          <span className="text-stone-400">Didn't get it?</span>
+          {resendTimer > 0 ? (
+            <span className="text-stone-300 font-bold">Resend in {resendTimer}s</span>
+          ) : (
+            <button
+              disabled={signup.resendLoading}
+              onClick={async () => { await signup.resendOtp(); setResendTimer(60); }}
+              className="text-amber-600 font-bold hover:text-amber-700 transition-colors disabled:opacity-40">
+              {signup.resendLoading ? "Sending…" : "Resend code"}
+            </button>
+          )}
+        </div>
+
+        {/* Back */}
+        <button onClick={() => { signup.resetSendError(); signup.resetVerifyError(); }}
+          className="mt-6 text-xs text-stone-400 hover:text-stone-600 transition-colors">
+          ← Back to sign up
+        </button>
+      </div>
+    );
+  }
 
   // ── Success screen ──────────────────────────────────────────────────────────
   if (done) {
@@ -506,14 +618,23 @@ function AuthPanel() {
             {error}
           </div>
         )}
+        {signup.sendError && tab === "signup" && (
+          <div className="flex items-start gap-2.5 bg-rose-50 border border-rose-200 text-rose-600 text-xs px-4 py-3 rounded-xl">
+            <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            {signup.sendError}
+          </div>
+        )}
 
         {/* Submit */}
         <button
           type="submit"
-          disabled={loading || (tab === "signup" && (!agreed || (suConfirm.length > 0 && suConfirm !== suPass)))}
+          disabled={
+            (tab === "signin" ? loading : signup.sendLoading) ||
+            (tab === "signup" && (!agreed || (suConfirm.length > 0 && suConfirm !== suPass)))
+          }
           className="w-full mt-6 bg-stone-900 hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition-all duration-300 hover:shadow-xl hover:shadow-stone-900/20 hover:scale-[1.01] active:scale-[0.99] text-sm flex items-center justify-center gap-2"
         >
-          {loading ? (
+          {(tab === "signin" ? loading : signup.sendLoading) ? (
             <>
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
