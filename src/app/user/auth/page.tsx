@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUserLogin }  from "@/hooks/eventimist/user/auth/useUserLogin";
 import { useUserSignup } from "@/hooks/eventimist/user/auth/useUserSignup";
+import { useOAuthSignIn } from "@/hooks/clerk/useClerkOauth";
 
 // ─── Carousel slides (user/discover theme) ───────────────────────────────────
 const USER_SLIDES = [
@@ -157,9 +158,24 @@ function EyeIcon({ open }: { open: boolean }) {
 }
 
 // ─── Google button ────────────────────────────────────────────────────────────
-function GoogleButton() {
+type GooglePurpose = "login" | "signup";
+
+function GoogleButton({ purpose }: { purpose: GooglePurpose }) {
+  const { signInWith, signOut, user, session } = useOAuthSignIn();
+
+  const handleOauth = async () => {
+    if (user && session) {
+      // sign out without leaving the current UI flow; keep in place
+      await signOut({ redirectUrl: window.location.href });
+    }
+
+    await signInWith(`/user/oauth-confirm?purpose=${purpose}`);
+  };
+
+
   return (
     <button
+      onClick={handleOauth}
       type="button"
       className="w-full flex items-center justify-center gap-2 border border-stone-200 hover:border-stone-300 hover:bg-stone-50 rounded-xl py-2.5 text-sm font-semibold text-stone-600 transition-all"
     >
@@ -658,7 +674,7 @@ function AuthPanel() {
           <span className="text-stone-300 text-xs font-medium">or</span>
           <div className="flex-1 h-px bg-stone-100" />
         </div>
-        <GoogleButton />
+        <GoogleButton purpose={tab === "signin" ? "login" : "signup"} />
 
         {/* Switch tab */}
         <p className="text-center text-stone-400 text-xs mt-5">
