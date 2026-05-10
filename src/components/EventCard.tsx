@@ -6,7 +6,7 @@ export interface Event {
   id: string; title: string; type: string; description: string;
   date: string; venue: string; tags: string[]; image_url: string;
   attendance: number; organizerName: string; organizer: string;
-  organizerProfilepic: string; latitude: number; longitude: number; organizerId: string;
+  organizerProfilepic: string; latitude: number; longitude: number; organizerId: string; slug:string;
 }
 
 export const TYPE_META: Record<string, { bg:string; text:string; bgLight:string; textLight:string; dot:string; hex:string }> = {
@@ -47,7 +47,7 @@ export function MapPopupCard({ event, onClose, dark = true }: {
       ${d(dark,"bg-[#13151f] border-white/12 shadow-black/70","bg-white border-stone-200 shadow-stone-300/50")}`}>
       <div className="relative h-32 overflow-hidden">
         <img src={event.image_url} alt={event.title} className="w-full h-full object-cover"/>
-        <div className={`absolute inset-0 bg-gradient-to-t ${d(dark,"from-[#13151f]","from-white/20")} via-transparent to-transparent`}/>
+        <div className={`absolute inset-0 bg-gradient-to-t ${d(dark,"from-[#13151f]","from-white/90")} via-transparent to-transparent`}/>
         <span className={`absolute top-2.5 left-2.5 inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-sm border
           ${d(dark,`${tc.bg} ${tc.text} border-white/10`,`${tc.bgLight} ${tc.textLight} border-transparent`)}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${tc.dot}`}/>{event.type}
@@ -86,8 +86,19 @@ export function MapPopupCard({ event, onClose, dark = true }: {
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
               {event.attendance.toLocaleString()}
             </span>
-            <button className="text-[10px] font-black text-amber-500 bg-amber-400/12 border border-amber-400/25 hover:bg-amber-400/22 px-2.5 py-1 rounded-lg transition-all">
-              RSVP
+            <button className="text-[10px] font-black text-amber-500 bg-amber-400/12 border border-amber-400/25 hover:bg-amber-400/22 px-2.5 py-1 rounded-lg transition-all"
+              onClick={() => {
+                const data = encodeURIComponent(JSON.stringify({
+                  id: event.id, title: event.title, description: event.description,
+                  category: event.type.toUpperCase(), startTime: event.date,
+                  timezone: "Asia/Kolkata", mode: "OFFLINE",
+                  venue: event.venue, latitude: event.latitude, longitude: event.longitude,
+                  coverImage: event.image_url, distance: 0,
+                  organizerName: event.organizerName, organizerImage: event.organizerProfilepic,
+                }));
+                window.location.href = `/events/${event.slug}`;
+              }}>
+              View →
             </button>
           </div>
         </div>
@@ -122,7 +133,7 @@ export function EventCard({ event, onClick, active, dark = true }: {
       <div className="relative h-40 overflow-hidden">
         <img src={event.image_url} alt={event.title}
           className={`w-full h-full object-cover transition-transform duration-500 ${hovered ? "scale-105" : "scale-100"}`}/>
-        <div className={`absolute inset-0 bg-gradient-to-t ${d(dark,"from-[#13151f]","from-white/20")} via-transparent to-transparent`}/>
+        <div className={`absolute inset-0 bg-gradient-to-t ${d(dark,"from-[#13151f]","from-white/80")} via-transparent to-transparent`}/>
 
         {/* Category badge */}
         <span className={`absolute top-3 left-3 inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm border

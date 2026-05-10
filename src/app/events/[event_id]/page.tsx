@@ -1,712 +1,515 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { TYPE_META } from "@/components/EventCard";
-import type { Event } from "@/components/EventCard";
+// src/app/events/[id]/page.tsx
 
-// ─── Extended event shape ─────────────────────────────────────────────────────
-interface EventDetail extends Event {
-  images:        string[];
-  about:         string;
-  schedule:      { time: string; title: string; detail: string; isHeadline?: boolean }[];
-  highlights:    string[];
-  faqs:          { q: string; a: string }[];
-  relatedEvents: Event[];
-}
-
-// ─── Dummy data — swap with fetchEvent(params.event_id) ───────────────────────
-const EVENT: EventDetail = {
-  id: "1",
-  title: "Sunburn Arena ft. Martin Garrix",
-  type: "Music",
-  description: "India's premier electronic music festival returns with a massive lineup.",
-  about: `Sunburn Arena returns to Delhi for its most ambitious edition yet. Martin Garrix — the Dutch DJ who became the world's #1 at just 17 — headlines a production unlike anything India has witnessed: a 120-metre LED wall, 40-metre pyro towers, and a sound system that could fill a city block.\n\nThe night opens with a curated lineup of India's finest electronic acts across two stages. As midnight approaches, Garrix takes command for a three-hour set spanning his biggest anthems, unreleased material, and genre-defying collabs.\n\nExpect laser cannons, confetti storms, and 20,000 fellow believers losing themselves in the music. There are no tourists here — only tribe.`,
-  date: "2025-08-12T19:00:00",
-  venue: "JLN Stadium, New Delhi",
-  tags: ["EDM", "Festival", "Live", "Electronic", "DJ"],
-  image_url: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1200&q=85",
-  images: [
-    "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1200&q=85",
-    "https://images.unsplash.com/photo-1493676304819-0d7a8d026dcf?w=1200&q=85",
-    "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=1200&q=85",
-    "https://images.unsplash.com/photo-1429962714451-bb934ecdc4ec?w=1200&q=85",
-    "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200&q=85",
-  ],
-  attendance: 18400,
-  organizerName: "Percept Live",
-  organizer: "perceptlive",
-  organizerProfilepic: "https://i.pravatar.cc/80?img=11",
-  latitude: 28.5867, longitude: 77.2355, organizerId: "org1",
-  schedule: [
-    { time: "6:30 PM",  title: "VIP & Premium Gates Open", detail: "Early entry for VIP & Premium ticket holders" },
-    { time: "7:00 PM",  title: "General Gates Open",       detail: "All gates open. Security check at all entrances" },
-    { time: "7:30 PM",  title: "Opening Acts — Stage 2",   detail: "Local Delhi artists warm up the crowd" },
-    { time: "8:30 PM",  title: "BLOT! Live",               detail: "Bengaluru's experimental techno duo" },
-    { time: "9:30 PM",  title: "Arjun Vagale",             detail: "India's techno ambassador plays a special set" },
-    { time: "10:30 PM", title: "Production Showcase",      detail: "Pyrotechnics, CO₂ cannons, full LED takeover" },
-    { time: "11:00 PM", title: "Martin Garrix",            detail: "Headline set — 3 hours of pure euphoria", isHeadline: true },
-    { time: "2:00 AM",  title: "Afterparty @ Club 1",      detail: "VIP wristbands grant access" },
-  ],
-  highlights: [
-    "120-metre dual-sided LED stage wall",
-    "40-metre pyrotechnics towers left & right",
-    "d&b Audiotechnik J-Series line array system",
-    "Confetti + CO₂ cannon volleys at midnight",
-    "Dedicated VIP deck with elevated viewing",
-    "6 premium F&B zones across the arena",
-    "Official merch pop-up — exclusive Night Run capsule",
-    "Accessible viewing platforms & hearing loops",
-  ],
-  faqs: [
-    { q: "What time do gates open?",  a: "General gates open at 7:00 PM. VIP & Premium gates open at 6:30 PM." },
-    { q: "Are cameras allowed?",      a: "Personal cameras without detachable lenses are permitted. Professional equipment is not." },
-    { q: "Is re-entry allowed?",      a: "No re-entry once you exit the venue." },
-    { q: "What's the age limit?",     a: "18+ only. Valid government-issued photo ID required at entry." },
-    { q: "Is there parking?",         a: "Limited parking at Gate 7. We strongly recommend metro — JLN Stadium Metro Station is a 5-min walk." },
-    { q: "Can I bring my own food?",  a: "Outside food and beverages are not permitted. 6 F&B zones are inside." },
-  ],
-  relatedEvents: [
-    {
-      id: "r1", title: "Nucleya Live — The Bass God Returns", type: "Music",
-      description: "Delhi's most anticipated bass music event of the year.",
-      date: "2025-09-03T20:00:00", venue: "Jawaharlal Nehru Stadium, Delhi",
-      tags: ["Bass", "Electronic"],
-      image_url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
-      attendance: 12000, organizerName: "OML Entertainment", organizer: "omlive",
-      organizerProfilepic: "https://i.pravatar.cc/40?img=30",
-      latitude: 28.5823, longitude: 77.2337, organizerId: "orgR1",
-    },
-    {
-      id: "r2", title: "Delhi Tech Summit 2025", type: "Tech",
-      description: "Two days of AI, cloud infra, and developer tooling. 80+ speakers.",
-      date: "2025-08-18T09:00:00", venue: "Bharat Mandapam, Pragati Maidan",
-      tags: ["AI", "Web3"],
-      image_url: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&q=80",
-      attendance: 4200, organizerName: "TechIndia Foundation", organizer: "techindia",
-      organizerProfilepic: "https://i.pravatar.cc/40?img=12",
-      latitude: 28.6189, longitude: 77.2438, organizerId: "org2",
-    },
-    {
-      id: "r3", title: "Lodhi Art District Open Day", type: "Art",
-      description: "Step inside the world's largest open-air art district.",
-      date: "2025-08-25T10:00:00", venue: "Lodhi Colony, New Delhi",
-      tags: ["Mural", "Contemporary", "Free"],
-      image_url: "https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=600&q=80",
-      attendance: 800, organizerName: "St+art India", organizer: "startindia",
-      organizerProfilepic: "https://i.pravatar.cc/40?img=16",
-      latitude: 28.5906, longitude: 77.2256, organizerId: "org4",
-    },
-  ],
-};
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useGetEvent } from "@/hooks/eventimist/user/events/useGetEvent";
+import { QueryProvider } from "@/components/QueryProvider";
+import type { GetEventResponse } from "@/services/eventimist/user/events/GetEvent.service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const fmtFull  = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-const fmtShort = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-const fmtTime  = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+const CATEGORY_META: Record<string, { emoji: string; color: string }> = {
+  MUSIC:"{🎵,#7c3aed}".split(",").reduce((a,v,i)=>({...a,[i===0?"emoji":"color"]:v.replace(/[{}]/g,"")}),{}) as any,
+  TECH:         { emoji:"💻", color:"#1d4ed8" },
+  FOOD:         { emoji:"🍜", color:"#c2410c" },
+  ART:          { emoji:"🎨", color:"#be185d" },
+  SPORTS:       { emoji:"⚽", color:"#15803d" },
+  FESTIVAL:     { emoji:"🎪", color:"#b45309" },
+  VOLUNTEER:    { emoji:"🤝", color:"#0f766e" },
+  NETWORKING:   { emoji:"🔗", color:"#0e7490" },
+  WORKSHOP:     { emoji:"🛠", color:"#be123c" },
+  CONFERENCE:   { emoji:"🎤", color:"#4338ca" },
+  EDUCATION:    { emoji:"📚", color:"#0369a1" },
+  BUSINESS:     { emoji:"💼", color:"#4d7c0f" },
+  HEALTH:       { emoji:"🏥", color:"#047857" },
+  ENTERTAINMENT:{ emoji:"🎬", color:"#a21caf" },
+  GAMING:       { emoji:"🎮", color:"#c2410c" },
+};
 
-// ─── Countdown ────────────────────────────────────────────────────────────────
-function Countdown({ target }: { target: string }) {
-  const calc = () => Math.max(0, new Date(target).getTime() - Date.now());
-  const [ms, setMs] = useState(calc);
-  useEffect(() => {
-    const id = setInterval(() => setMs(calc()), 1000);
-    return () => clearInterval(id);
-  }, [target]);
-  const units = [
-    { v: Math.floor(ms / 86400000),                       l: "D" },
-    { v: Math.floor((ms % 86400000) / 3600000),           l: "H" },
-    { v: Math.floor((ms % 3600000) / 60000),              l: "M" },
-    { v: Math.floor((ms % 60000) / 1000),                 l: "S" },
-  ];
-  return (
-    <div className="flex items-center gap-1.5">
-      {units.map(({ v, l }, i) => (
-        <div key={l} className="flex items-center gap-1.5">
-          <div className="flex flex-col items-center">
-            <span className="text-amber-400 font-black text-sm tabular-nums leading-none"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-              {String(v).padStart(2, "0")}
-            </span>
-            <span className="text-white/25 text-[8px] font-black tracking-widest mt-0.5">{l}</span>
-          </div>
-          {i < 3 && <span className="text-white/20 text-xs font-black mb-2">:</span>}
-        </div>
-      ))}
-    </div>
-  );
+function fmtDay(dt: string) {
+  return new Date(dt).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+}
+function fmtTime(dt: string) {
+  return new Date(dt).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}).toUpperCase();
+}
+function fmtDuration(s: string, e: string) {
+  const ms = new Date(e).getTime()-new Date(s).getTime();
+  const h  = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000);
+  return h>0?`${h}h${m>0?` ${m}m`:""}` : `${m}m`;
 }
 
-// ─── Compact Carousel ─────────────────────────────────────────────────────────
-function Carousel({ images, title }: { images: string[]; title: string }) {
-  const [cur, setCur]         = useState(0);
-  const [dragStart, setDragStart] = useState(0);
-  const [dragging, setDragging]   = useState(false);
-  const [dx, setDx]           = useState(0);
-  const autoRef               = useRef<ReturnType<typeof setInterval> | null>(null);
-  const n                     = images.length;
+// ─── Compact image carousel ───────────────────────────────────────────────────
+function Carousel({ images }: { images: string[] }) {
+  const [idx, setIdx] = useState(0);
+  const prev = () => setIdx(i => (i-1+images.length)%images.length);
+  const next = () => setIdx(i => (i+1)%images.length);
 
-  const stopAuto = useCallback(() => { if (autoRef.current) clearInterval(autoRef.current); }, []);
-  const go = useCallback((idx: number) => setCur(((idx % n) + n) % n), [n]);
-
-  useEffect(() => {
-    autoRef.current = setInterval(() => go(cur + 1), 5000);
-    return stopAuto;
-  }, [cur, go, stopAuto]);
-
-  const pd = (x: number) => { setDragging(true); setDragStart(x); stopAuto(); };
-  const pm = (x: number) => { if (dragging) setDx(x - dragStart); };
-  const pu = () => { if (dx < -50) go(cur + 1); else if (dx > 50) go(cur - 1); setDragging(false); setDx(0); };
+  if (!images.length) return null;
 
   return (
-    <div className="relative w-full h-full overflow-hidden rounded-2xl select-none cursor-grab active:cursor-grabbing"
-      onMouseDown={e => pd(e.clientX)} onMouseMove={e => pm(e.clientX)} onMouseUp={pu} onMouseLeave={pu}
-      onTouchStart={e => pd(e.touches[0].clientX)} onTouchMove={e => pm(e.touches[0].clientX)} onTouchEnd={pu}
-    >
-      {/* Track */}
-      <div className="absolute inset-0 flex"
-        style={{
-          width: `${n * 100}%`,
-          transform: `translateX(calc(${-cur * (100 / n)}% + ${dx / n}px))`,
-          transition: dragging ? "none" : "transform 0.6s cubic-bezier(0.25,0.46,0.45,0.94)",
-        }}>
-        {images.map((src, i) => (
-          <div key={i} className="relative flex-shrink-0 h-full" style={{ width: `${100 / n}%` }}>
-            <img src={src} alt={`${title} ${i + 1}`} className="w-full h-full object-cover" draggable={false} />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/20" />
-          </div>
-        ))}
-      </div>
+    <div className="group relative rounded-2xl overflow-hidden bg-stone-900" style={{ height:320 }}>
+      {images.map((src, i) => (
+        <img key={i} src={src} alt={`Event photo ${i+1}`}
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
+          style={{ opacity: i===idx ? 1 : 0 }}
+        />
+      ))}
+      {/* Subtle vignette */}
+      <div className="absolute inset-0 pointer-events-none"
+        style={{ background:"radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.35) 100%)" }}/>
 
       {/* Arrows */}
-      {[{ d: -1, s: "left-3", a: "‹" }, { d: 1, s: "right-3", a: "›" }].map(({ d, s, a }) => (
-        <button key={d} onClick={e => { e.stopPropagation(); stopAuto(); go(cur + d); }}
-          className={`absolute ${s} top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm text-white/70 hover:text-white hover:bg-black/65 transition-all text-xl font-light flex items-center justify-center hover:scale-110`}>
-          {a}
-        </button>
-      ))}
+      {images.length > 1 && (
+        <>
+          <button onClick={prev}
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+            style={{ background:"rgba(255,255,255,.9)", backdropFilter:"blur(8px)" }}>
+            <svg className="w-4 h-4 text-stone-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <button onClick={next}
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+            style={{ background:"rgba(255,255,255,.9)", backdropFilter:"blur(8px)" }}>
+            <svg className="w-4 h-4 text-stone-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </>
+      )}
 
-      {/* Dots */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5">
-        {images.map((_, i) => (
-          <button key={i} onClick={() => { stopAuto(); go(i); }}
-            className={`rounded-full transition-all duration-300 ${i === cur ? "w-5 h-1.5 bg-amber-400" : "w-1.5 h-1.5 bg-white/35 hover:bg-white/65"}`} />
-        ))}
-      </div>
+      {/* Thumbnails strip */}
+      {images.length > 1 && (
+        <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 px-4">
+          {images.map((src, i) => (
+            <button key={i} onClick={() => setIdx(i)}
+              className="transition-all duration-200 rounded-md overflow-hidden flex-shrink-0"
+              style={{ width:i===idx?40:28, height:28, opacity:i===idx?1:0.55, outline:i===idx?"2px solid white":"none", outlineOffset:1 }}>
+              <img src={src} alt="" className="w-full h-full object-cover"/>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Counter */}
-      <div className="absolute top-3 right-3 z-10 bg-black/40 backdrop-blur-sm border border-white/10 rounded-full px-2.5 py-1 text-white/50 text-[10px] font-bold">
-        {cur + 1}/{n}
+      <div className="absolute top-3 right-3 text-[10px] font-black text-white px-2 py-0.5 rounded-full"
+        style={{ background:"rgba(0,0,0,.45)", backdropFilter:"blur(6px)" }}>
+        {idx+1}/{images.length}
       </div>
     </div>
   );
 }
 
-// ─── FAQ item ─────────────────────────────────────────────────────────────────
-function FaqItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
+// ─── RSVP Button ──────────────────────────────────────────────────────────────
+function RSVPButton({ rsvped, count }: { rsvped: boolean; count: number }) {
+  const [state, setState] = useState<"idle"|"loading"|"done">(rsvped ? "done" : "idle");
+  const [cnt,   setCnt]   = useState(count);
+
+  const handle = async () => {
+    if (state === "done") return;
+    setState("loading");
+    await new Promise(r => setTimeout(r,1000));
+    setState("done"); setCnt(c => c+1);
+  };
+
   return (
-    <div className="border-b border-white/7 last:border-0">
+    <button onClick={handle} disabled={state==="loading" || state==="done"}
+      className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 disabled:cursor-default"
+      style={{
+        background: state==="done"
+          ? "linear-gradient(135deg,#14532d,#166534)"
+          : "linear-gradient(135deg,#1c1917,#292524)",
+        color: "white",
+        boxShadow: state==="done"
+          ? "0 4px 16px rgba(20,83,45,.35)"
+          : "0 4px 16px rgba(0,0,0,.25)",
+      }}>
+      {state==="loading" ? (
+        <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>Reserving…</>
+      ) : state==="done" ? (
+        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+        </svg>You're going! · {cnt} attending</>
+      ) : (
+        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path d="M2 9a3 3 0 010 6v2a2 2 0 002 2h16a2 2 0 002-2v-2a3 3 0 010-6V7a2 2 0 00-2-2H4a2 2 0 00-2 2v2z"/>
+        </svg>Reserve Free Spot</>
+      )}
+    </button>
+  );
+}
+
+// ─── Add to Calendar ──────────────────────────────────────────────────────────
+function addToCalendar(event: GetEventResponse) {
+  const start  = event.startTime.replace(/[-:]/g,"").slice(0,15)+"Z";
+  const end    = event.endTime
+    ? event.endTime.replace(/[-:]/g,"").slice(0,15)+"Z"
+    : start;
+  const url    = `https://calendar.google.com/calendar/render?action=TEMPLATE`
+    + `&text=${encodeURIComponent(event.title)}`
+    + `&dates=${start}/${end}`
+    + `&details=${encodeURIComponent(event.description.slice(0,300))}`
+    + `&location=${encodeURIComponent(event.venue)}`
+    + `&sf=true&output=xml`;
+  window.open(url, "_blank");
+}
+
+// ─── Share ────────────────────────────────────────────────────────────────────
+function ShareMenu({ link, title }: { link: string; title: string }) {
+  const [open,    setOpen]    = useState(false);
+  const [copied,  setCopied]  = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(link);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareOptions = [
+    { label:"Copy link",   fn: copy,                                                              icon:<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></> },
+    { label:"WhatsApp",    fn: ()=>window.open(`https://wa.me/?text=${encodeURIComponent(title+" "+link)}`,"_blank"), icon:<path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/> },
+    { label:"Twitter / X", fn: ()=>window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(link)}`,"_blank"), icon:<path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/> },
+  ];
+
+  return (
+    <div ref={ref} className="relative">
       <button onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between py-4 text-left gap-4 group">
-        <span className={`text-sm font-medium transition-colors ${open ? "text-white" : "text-white/60 group-hover:text-white/85"}`}>{q}</span>
-        <div className={`w-5 h-5 flex-shrink-0 rounded-full border flex items-center justify-center transition-all duration-300 ${open ? "border-amber-400/50 bg-amber-400/10 text-amber-400 rotate-45" : "border-white/12 text-white/25"}`}>
-          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14"/>
-          </svg>
-        </div>
+        className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border transition-all"
+        style={{ borderColor:"#e7e5e4", background:"white", color:"#57534e" }}>
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        </svg>
+        Share
       </button>
-      <div className={`overflow-hidden transition-all duration-300 ${open ? "max-h-40 opacity-100 pb-4" : "max-h-0 opacity-0"}`}>
-        <p className="text-white/40 text-sm leading-relaxed">{a}</p>
-      </div>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-44 rounded-xl border border-stone-100 bg-white shadow-xl z-50 overflow-hidden py-1">
+          {shareOptions.map(opt => (
+            <button key={opt.label} onClick={() => { opt.fn(); if (opt.label!=="Copy link") setOpen(false); }}
+              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors text-left">
+              <svg className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">{opt.icon}</svg>
+              {opt.label === "Copy link" && copied ? "Copied! ✓" : opt.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Related mini-card ────────────────────────────────────────────────────────
-function RelatedCard({ ev }: { ev: Event }) {
-  const tc = TYPE_META[ev.type] ?? TYPE_META.default;
+// ─── Occupancy bar ────────────────────────────────────────────────────────────
+function OccupancyBar({ rsvp, attendance }: { rsvp: number; attendance: number }) {
+  const pct = Math.min(100, Math.round((rsvp / Math.max(rsvp, 500)) * 100));
   return (
-    <a href={`/events/${ev.id}`}
-      className="group flex gap-3 bg-white/3 border border-white/7 hover:border-white/16 rounded-xl p-3 transition-all hover:-translate-y-0.5">
-      <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden">
-        <img src={ev.image_url} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+    <div>
+      <div className="flex justify-between text-[10px] font-bold text-stone-400 mb-1.5">
+        <span>RSVP · {rsvp.toLocaleString()}</span>
+        <span>{attendance.toLocaleString()} attended</span>
       </div>
-      <div className="flex flex-col justify-between min-w-0 py-0.5">
-        <div>
-          <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${tc.bg} ${tc.text}`}>
-            <span className={`w-1 h-1 rounded-full ${tc.dot}`} />{ev.type}
-          </span>
-          <div className="text-white/75 text-xs font-semibold leading-snug line-clamp-2 group-hover:text-white transition-colors">{ev.title}</div>
-        </div>
-        <div className="text-white/25 text-[10px]">{fmtShort(ev.date)}</div>
+      <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden">
+        <div className="h-full rounded-full bg-stone-900 transition-all duration-1000"
+          style={{ width:`${pct}%` }}/>
       </div>
-    </a>
-  );
-}
-
-// ─── Nav ──────────────────────────────────────────────────────────────────────
-function Nav({ solid }: { solid: boolean }) {
-  return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 h-16 flex items-center px-5 transition-all duration-300 ${solid ? "bg-[#0d0f17]/96 backdrop-blur-xl border-b border-white/6" : "bg-[#0d0f17]/80 backdrop-blur-sm"}`}>
-      <div className="max-w-6xl mx-auto w-full flex items-center gap-3">
-        <a href="/discover" className="flex items-center gap-1.5 text-white/40 hover:text-white/80 transition-colors text-sm font-semibold">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          <span className="hidden sm:block">Discover</span>
-        </a>
-        <div className="w-px h-4 bg-white/10" />
-        <a href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white">
-              <rect x="3" y="4" width="18" height="18" rx="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </div>
-          <span className="text-white font-black text-base hidden sm:block" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>eventimist</span>
-        </a>
-        <div className="ml-auto flex items-center gap-2">
-          <button className="w-8 h-8 rounded-xl flex items-center justify-center text-white/35 hover:text-white/70 hover:bg-white/6 transition-all">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-            </svg>
-          </button>
-          <a href="/user" className="text-sm font-black bg-gradient-to-r from-amber-400 to-orange-500 text-[#0d0f17] px-4 py-2 rounded-xl hover:shadow-lg hover:shadow-amber-400/25 hover:scale-[1.02] transition-all">
-            Sign In
-          </a>
-        </div>
-      </div>
-    </nav>
+    </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function EventDetailPage() {
-  const e  = EVENT;
-  const tc = TYPE_META[e.type] ?? TYPE_META.default;
+export default function EventViewPage() {
+  return (
+    <QueryProvider>
+      <EventViewPageInner/>
+    </QueryProvider>
+  );
+}
 
-  const [scrolled,  setScrolled]  = useState(false);
-  const [activeTab, setActiveTab] = useState<"about" | "schedule" | "faq">("about");
-  const [saved,     setSaved]     = useState(false);
-  const [rsvpDone,  setRsvpDone]  = useState(false);
+function EventViewPageInner() {
+  const router = useRouter();
+  const params = useParams();
+  
+  const slug   = params?.event_id as string;
 
-  useEffect(() => {
-    const h = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", h, { passive: true });
-    return () => window.removeEventListener("scroll", h);
-  }, []);
+  console.log("slug is <<<<<<<<<<<<", params);
+
+  const { event: ev, loading, error } = useGetEvent(slug);
+  const [vis, setVis] = useState(false);
+  const [bkm, setBkm] = useState(false);
+
+  useEffect(() => { const t = setTimeout(()=>setVis(true),60); return ()=>clearTimeout(t); }, []);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background:"#faf9f7" }}>
+      <div className="flex flex-col items-center gap-4">
+        <svg className="w-8 h-8 animate-spin text-stone-400" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        <p className="text-stone-400 text-sm font-medium">Loading event…</p>
+      </div>
+    </div>
+  );
+
+  if (error || !ev) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background:"#faf9f7" }}>
+      <div className="text-center px-6">
+        <div className="text-5xl mb-4">😕</div>
+        <h2 className="text-stone-900 font-black text-xl mb-2"
+          style={{fontFamily:"'DM Serif Display',Georgia,serif"}}>Event not found</h2>
+        <p className="text-stone-400 text-sm mb-5">{error ?? "This event couldn't be loaded."}</p>
+        <button onClick={() => router.replace("/discover")}
+          className="bg-stone-900 text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-stone-700 transition-colors">
+          ← Back to Discover
+        </button>
+      </div>
+    </div>
+  );
+
+  const cat       = CATEGORY_META[ev.category.toUpperCase()] ?? { emoji:"📅", color:"#44403c" };
+  const allImgs   = [ev.coverImage, ...(ev.images ?? [])].filter((v,i,a) => v && a.indexOf(v)===i);
+  const dur       = fmtDuration(ev.startTime, ev.endTime);
+  const modeLabel = { ONLINE:"Online", OFFLINE:"In-Person", HYBRID:"Hybrid" }[ev.mode] ?? ev.mode;
+  const shareLink = typeof window!=="undefined" ? window.location.href : `https://eventimist.com/events/${ev.slug ?? slug}`;
+  const mapLink   = `https://maps.google.com/?q=${ev.latitude},${ev.longitude}`;
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
-        *, *::before, *::after { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body { margin: 0; background: #0d0f17; color: white; font-family: 'DM Sans', system-ui, sans-serif; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 99px; }
-
-        .page-enter   { animation: pgEnter .65s cubic-bezier(0.16,1,0.3,1) both; }
-        .d1 { animation-delay: .08s; } .d2 { animation-delay: .18s; }
-        .d3 { animation-delay: .28s; } .d4 { animation-delay: .42s; }
-        @keyframes pgEnter { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
-
-        .fade-up { animation: fadeUp .5s cubic-bezier(0.16,1,0.3,1) both; }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-
-        .tab-line { position:relative; padding-bottom: 12px; }
-        .tab-line::after {
-          content:''; position:absolute; bottom:0; left:0; right:0;
-          height:2px; background:#f59e0b; border-radius:99px;
-          transform:scaleX(0); transform-origin:left;
-          transition:transform .22s cubic-bezier(0.34,1.56,0.64,1);
-        }
-        .tab-line.on::after { transform:scaleX(1); }
-
-        .pulse-dot { animation: pd 2.2s ease-in-out infinite; }
-        @keyframes pd { 0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.5)} 50%{box-shadow:0 0 0 7px rgba(251,191,36,0)} }
-
-        .rsvp-glow:not(:disabled):hover { box-shadow: 0 0 32px rgba(251,191,36,.35); }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+        *,*::before,*::after{box-sizing:border-box}
+        body{font-family:'Instrument Sans',system-ui,sans-serif;background:#faf9f7;color:#1c1917;margin:0}
+        .stagger{opacity:0;transform:translateY(20px);transition:opacity .55s ease,transform .55s ease}
+        .stagger.in{opacity:1;transform:none}
+        ::-webkit-scrollbar{width:3px}
+        ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:99px}
       `}</style>
 
-      <div className="min-h-screen bg-[#0d0f17]">
-        <Nav solid={scrolled} />
+      <div className="min-h-screen" style={{ background:"#faf9f7" }}>
 
-        {/* ══════════════════════════════════════════════════════
-            HERO — compact carousel + title block side by side
-        ══════════════════════════════════════════════════════ */}
-        <div className="max-w-6xl mx-auto px-5 pt-24 pb-10">
-          <div className="flex flex-col lg:flex-row gap-8 items-start">
-
-            {/* Carousel — compact, fixed height */}
-            <div className="page-enter d1 w-full lg:w-[52%] flex-shrink-0">
-              <div style={{ height: 420 }} className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60">
-                <Carousel images={e.images} title={e.title} />
-              </div>
-
-              {/* Thumbnail strip below carousel */}
-              <div className="flex gap-2 mt-3">
-                {e.images.slice(0, 5).map((src, i) => (
-                  <div key={i} className="flex-1 h-12 rounded-lg overflow-hidden opacity-60 hover:opacity-100 transition-opacity cursor-pointer">
-                    <img src={src} alt="" className="w-full h-full object-cover" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Title + meta + actions */}
-            <div className="flex-1 min-w-0 pt-1">
-
-              {/* Type badge + countdown inline */}
-              <div className="page-enter d1 flex items-center justify-between mb-4">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-full border border-white/12 ${tc.bg} ${tc.text}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${tc.dot}`} />{e.type}
-                </span>
-                <Countdown target={e.date} />
-              </div>
-
-              {/* Title */}
-              <h1 className="page-enter d2 text-3xl sm:text-4xl font-black text-white leading-[1.07] tracking-tight mb-5"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-                {e.title}
-              </h1>
-
-              {/* Key info pills */}
-              <div className="page-enter d3 flex flex-col gap-2.5 mb-6">
-                {[
-                  {
-                    icon: <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
-                    val: `${fmtFull(e.date)} · ${fmtTime(e.date)}`,
-                  },
-                  {
-                    icon: <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></>,
-                    val: e.venue,
-                  },
-                  {
-                    icon: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></>,
-                    val: `${e.attendance.toLocaleString()} attending`,
-                  },
-                ].map((row, i) => (
-                  <div key={i} className="flex items-center gap-2.5 text-white/55 text-sm">
-                    <svg className="w-4 h-4 text-amber-400/60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">{row.icon}</svg>
-                    <span>{row.val}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Tags */}
-              <div className="page-enter d3 flex flex-wrap gap-2 mb-7">
-                {e.tags.map(t => (
-                  <span key={t} className="text-xs font-semibold text-white/35 bg-white/4 border border-white/8 rounded-full px-3 py-1 hover:border-white/20 hover:text-white/60 transition-all cursor-pointer">
-                    #{t}
-                  </span>
-                ))}
-              </div>
-
-              {/* Action buttons */}
-              <div className="page-enter d4 flex flex-wrap gap-3 mb-6">
-                {/* RSVP */}
-                <button
-                  onClick={() => setRsvpDone(r => !r)}
-                  className={`rsvp-glow flex items-center gap-2 font-black px-6 py-3 rounded-xl text-sm transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] ${
-                    rsvpDone
-                      ? "bg-emerald-500/20 border border-emerald-400/40 text-emerald-300"
-                      : "bg-gradient-to-r from-amber-400 to-orange-500 text-[#0d0f17]"
-                  }`}>
-                  {rsvpDone ? (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                      RSVP'd
-                    </>
-                  ) : (
-                    <>
-                      RSVP Now
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                      </svg>
-                    </>
-                  )}
-                </button>
-
-                {/* Save */}
-                <button onClick={() => setSaved(s => !s)}
-                  className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] ${
-                    saved
-                      ? "bg-rose-500/15 border-rose-400/40 text-rose-300"
-                      : "bg-white/4 border-white/10 text-white/55 hover:bg-white/8 hover:text-white hover:border-white/22"
-                  }`}>
-                  <svg className={`w-4 h-4 transition-all ${saved ? "fill-rose-400 stroke-rose-400" : "fill-none stroke-current"}`} viewBox="0 0 24 24" strokeWidth="2">
-                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
-                  </svg>
-                  {saved ? "Saved" : "Save"}
-                </button>
-
-                {/* Share */}
-                <button className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold bg-white/4 border border-white/10 text-white/55 hover:bg-white/8 hover:text-white hover:border-white/22 transition-all hover:scale-[1.03] active:scale-[0.97]">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                  </svg>
-                  Share
-                </button>
-              </div>
-
-              {/* Organiser strip */}
-              <div className="page-enter d4 flex items-center gap-3 bg-white/3 border border-white/7 rounded-xl px-4 py-3">
-                <img src={e.organizerProfilepic} alt={e.organizerName}
-                  className="w-9 h-9 rounded-xl object-cover ring-2 ring-white/10 flex-shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-white/75 text-xs font-bold">{e.organizerName}</div>
-                  <div className="text-white/28 text-[10px]">@{e.organizer} · Organiser</div>
-                </div>
-                <a href={`/organizers/${e.organizerId}`}
-                  className="ml-auto flex-shrink-0 text-[10px] font-bold text-white/35 border border-white/10 px-3 py-1.5 rounded-lg hover:border-white/25 hover:text-white/65 transition-all">
-                  Profile
-                </a>
-              </div>
+        {/* ── Top bar ── */}
+        <div className="sticky top-0 z-40 border-b border-stone-200/70"
+          style={{ background:"rgba(250,249,247,.93)", backdropFilter:"blur(14px)" }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+            <button onClick={() => router.back()}
+              className="flex items-center gap-2 text-sm font-semibold text-stone-500 hover:text-stone-900 transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6"/></svg>
+              <span className="hidden sm:block">Discover</span>
+            </button>
+            <div className="flex items-center gap-2">
+              {/* Bookmark */}
+              <button onClick={() => setBkm(b => !b)}
+                className="w-8 h-8 rounded-xl border flex items-center justify-center transition-all"
+                style={{ borderColor:bkm?"#d97706":"#e7e5e4", background:bkm?"#fffbeb":"white", color:bkm?"#d97706":"#78716c" }}>
+                <svg className="w-4 h-4" fill={bkm?"currentColor":"none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                </svg>
+              </button>
+              <ShareMenu link={shareLink} title={ev.title}/>
             </div>
           </div>
         </div>
 
-        {/* ══════════════════════════════════════════════════════
-            DIVIDER
-        ══════════════════════════════════════════════════════ */}
-        <div className="max-w-6xl mx-auto px-5">
-          <div className="border-t border-white/6" />
-        </div>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-7 sm:py-10">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8">
 
-        {/* ══════════════════════════════════════════════════════
-            BODY — left content + right sidebar
-        ══════════════════════════════════════════════════════ */}
-        <div className="max-w-6xl mx-auto px-5 py-10">
-          <div className="flex flex-col lg:flex-row gap-10 xl:gap-14">
+            {/* ══ LEFT COLUMN ══════════════════════════════════════════════════ */}
+            <div className="space-y-6 min-w-0">
 
-            {/* ────────────── LEFT: tabs + venue + organiser ────────────── */}
-            <div className="flex-1 min-w-0 space-y-12">
+              {/* Title block */}
+              <div className={`stagger ${vis?"in":""}`} style={{ transitionDelay:"0ms" }}>
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border"
+                    style={{ color:cat.color, borderColor:`${cat.color}30`, background:`${cat.color}0d` }}>
+                    {cat.emoji} {ev.category.charAt(0)+ev.category.slice(1).toLowerCase()}
+                  </span>
+                  <span className="text-[11px] font-semibold text-stone-400 px-2 py-1 bg-stone-100 rounded-full">
+                    {modeLabel}
+                  </span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-black leading-tight text-stone-900 mb-3"
+                  style={{fontFamily:"'DM Serif Display',Georgia,serif"}}>
+                  {ev.title}
+                </h1>
+                {/* Tags */}
+                <div className="flex flex-wrap gap-1.5">
+                  {ev.tags.map(tag => (
+                    <span key={tag} className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
 
-              {/* Tab bar */}
-              <div>
-                <div className="flex items-center gap-7 border-b border-white/8 mb-8">
-                  {(["about", "schedule", "faq"] as const).map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)}
-                      className={`tab-line text-sm font-bold capitalize transition-colors ${activeTab === tab ? "on text-white" : "text-white/30 hover:text-white/60"}`}>
-                      {tab === "faq" ? "FAQ" : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    </button>
+              {/* Image carousel — compact */}
+              <div className={`stagger ${vis?"in":""}`} style={{ transitionDelay:"80ms" }}>
+                <Carousel images={allImgs}/>
+              </div>
+
+              {/* Organizer */}
+              <div className={`stagger ${vis?"in":""} flex items-center gap-4 bg-white border border-stone-100 rounded-2xl p-4 shadow-sm`}
+                style={{ transitionDelay:"140ms" }}>
+                <div className="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+                  {ev.organizerImage
+                    ? <img src={ev.organizerImage} alt={ev.organizerName} className="w-full h-full object-cover"/>
+                    : <div className="w-full h-full bg-stone-900 flex items-center justify-center text-white text-sm font-black">{ev.organizerName[0]}</div>
+                  }
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black tracking-widest uppercase text-stone-400">Organised by</p>
+                  <p className="text-stone-900 font-bold text-sm mt-0.5 truncate">{ev.organizerName}</p>
+                </div>
+                <button className="ml-auto flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 text-stone-600 hover:border-stone-900 hover:text-stone-900 transition-all bg-white">
+                  Follow
+                </button>
+              </div>
+
+              {/* About */}
+              <div className={`stagger ${vis?"in":""} bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm`}
+                style={{ transitionDelay:"180ms" }}>
+                <div className="px-5 py-3.5 border-b border-stone-50">
+                  <h2 className="text-xs font-black tracking-widest uppercase text-stone-400">About this event</h2>
+                </div>
+                <div className="px-5 py-5">
+                  <p className="text-stone-600 text-sm leading-7 whitespace-pre-line">{ev.description}</p>
+                </div>
+              </div>
+
+              {/* Schedule */}
+              <div className={`stagger ${vis?"in":""} bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm`}
+                style={{ transitionDelay:"220ms" }}>
+                <div className="px-5 py-3.5 border-b border-stone-50">
+                  <h2 className="text-xs font-black tracking-widest uppercase text-stone-400">Date & Time</h2>
+                </div>
+                <div className="px-5 py-5 space-y-4">
+                  <div>
+                    <p className="text-stone-900 font-bold text-base">{fmtDay(ev.startTime)}</p>
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      <span className="text-stone-900 font-black text-2xl" style={{fontFamily:"'DM Serif Display',serif"}}>{fmtTime(ev.startTime)}</span>
+                      <svg className="w-4 h-4 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                      <span className="text-stone-500 font-semibold">{fmtTime(ev.endTime)}</span>
+                      {dur && <span className="text-xs font-bold text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{dur}</span>}
+                    </div>
+                    <p className="text-stone-400 text-xs mt-2 flex items-center gap-1.5">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      {ev.timezone}
+                    </p>
+                  </div>
+                  {/* Add to calendar */}
+                  <button onClick={() => addToCalendar(ev)}
+                    className="flex items-center gap-2 text-xs font-bold text-stone-600 hover:text-stone-900 border border-stone-200 hover:border-stone-400 px-3 py-2 rounded-xl transition-all bg-white w-fit">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      <line x1="12" y1="15" x2="12" y2="18"/><line x1="10.5" y1="16.5" x2="13.5" y2="16.5"/>
+                    </svg>
+                    Add to Google Calendar
+                  </button>
+                </div>
+              </div>
+
+              {/* Location */}
+              <div className={`stagger ${vis?"in":""} bg-white border border-stone-100 rounded-2xl overflow-hidden shadow-sm`}
+                style={{ transitionDelay:"260ms" }}>
+                <div className="px-5 py-3.5 border-b border-stone-50">
+                  <h2 className="text-xs font-black tracking-widest uppercase text-stone-400">Location</h2>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-stone-900 font-semibold text-sm">{ev.venue}</p>
+                  {/* Map embed */}
+                  <iframe
+                    src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${ev.latitude},${ev.longitude}&zoom=15`}
+                    width="100%" height="200" className="w-full border-0 rounded-xl mt-1"
+                    loading="lazy" allowFullScreen referrerPolicy="no-referrer-when-downgrade" title={ev.venue}/>
+                  <a href={mapLink} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-500 hover:text-stone-900 transition-colors">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                    Open in Google Maps
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* ══ RIGHT COLUMN ═════════════════════════════════════════════════ */}
+            <div>
+              <div className={`stagger ${vis?"in":""} sticky top-20 space-y-4`}
+                style={{ transitionDelay:"60ms" }}>
+
+                {/* RSVP card */}
+                <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="px-5 pt-5 pb-4 border-b border-stone-50 space-y-1">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-2xl font-black text-stone-900"
+                        style={{fontFamily:"'DM Serif Display',serif"}}>
+                        {ev.isFree ? "Free" : `₹${ev.ticketPrice}`}
+                      </span>
+                      <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        Open to all
+                      </span>
+                    </div>
+                    <OccupancyBar rsvp={ev.rsvpCount} attendance={ev.attendance}/>
+                  </div>
+                  <div className="p-5 space-y-3">
+                    <RSVPButton rsvped={false} count={ev.rsvpCount}/>
+                    <p className="text-center text-[10px] text-stone-400 font-medium">
+                      No registration fee · Instant confirmation
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick info */}
+                <div className="bg-white border border-stone-100 rounded-2xl shadow-sm divide-y divide-stone-50">
+                  {[
+                    { label:"Date",     value:new Date(ev.startTime).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}), icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></> },
+                    { label:"Time",     value:`${fmtTime(ev.startTime)} · ${dur}`,                                                              icon:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></> },
+                    { label:"Location", value:ev.venue.split(",")[0],                                                                           icon:<><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></> },
+                    { label:"Mode",     value:modeLabel,                                                                                        icon:<><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></> },
+                  ].map(row => (
+                    <div key={row.label} className="flex items-center gap-3 px-4 py-3">
+                      <svg className="w-4 h-4 text-stone-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">{row.icon}</svg>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black tracking-wider uppercase text-stone-400">{row.label}</p>
+                        <p className="text-xs font-semibold text-stone-800 truncate mt-0.5">{row.value}</p>
+                      </div>
+                    </div>
                   ))}
                 </div>
 
-                {/* ABOUT */}
-                {activeTab === "about" && (
-                  <div className="fade-up space-y-8">
-                    <div className="space-y-4">
-                      {e.about.split("\n\n").map((p, i) => (
-                        <p key={i} className="text-white/55 text-sm leading-[1.9]">{p}</p>
-                      ))}
-                    </div>
-
-                    <div>
-                      <h3 className="text-white font-black text-base mb-4" style={{ fontFamily: "'Playfair Display',Georgia,serif" }}>
-                        What to expect
-                      </h3>
-                      <div className="grid sm:grid-cols-2 gap-2.5">
-                        {e.highlights.map((h, i) => (
-                          <div key={i} className="flex items-start gap-3 bg-white/3 border border-white/6 rounded-xl px-4 py-3 hover:border-white/12 transition-colors">
-                            <div className="w-4 h-4 flex-shrink-0 rounded-full bg-amber-400/12 border border-amber-400/22 flex items-center justify-center mt-0.5">
-                              <svg className="w-2.5 h-2.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
-                                <polyline points="20 6 9 17 4 12"/>
-                              </svg>
-                            </div>
-                            <span className="text-white/50 text-xs leading-relaxed">{h}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                {/* Shareable link */}
+                <div className="bg-white border border-stone-100 rounded-2xl shadow-sm p-4">
+                  <p className="text-[10px] font-black tracking-widest uppercase text-stone-400 mb-2.5">Share this event</p>
+                  <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5">
+                    <svg className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                    <span className="text-[10px] text-stone-500 truncate flex-1">{shareLink.replace("https://","")}</span>
+                    <button onClick={async()=>{await navigator.clipboard.writeText(shareLink);}}
+                      className="text-[10px] font-black text-stone-600 hover:text-stone-900 flex-shrink-0 border border-stone-200 bg-white px-2 py-0.5 rounded-lg transition-all">
+                      Copy
+                    </button>
                   </div>
-                )}
-
-                {/* SCHEDULE */}
-                {activeTab === "schedule" && (
-                  <div className="fade-up">
-                    {e.schedule.map((item, i) => (
-                      <div key={i} className="flex gap-4 group">
-                        <div className="flex flex-col items-center flex-shrink-0 w-[60px]">
-                          <div className={`w-2.5 h-2.5 rounded-full border-2 flex-shrink-0 mt-1.5 transition-all duration-300 group-hover:scale-125 ${
-                            item.isHeadline ? "border-amber-400 bg-amber-400 pulse-dot" : "border-white/18 bg-[#0d0f17] group-hover:border-white/45"
-                          }`} />
-                          {i < e.schedule.length - 1 && <div className="w-px flex-1 bg-white/6 my-1.5" />}
-                        </div>
-                        <div className={`flex-1 ${i < e.schedule.length - 1 ? "pb-6" : "pb-0"}`}>
-                          <div className="text-white/25 text-[10px] font-black tracking-[0.14em] uppercase mb-1">{item.time}</div>
-                          <div className={`font-bold text-sm mb-1 ${item.isHeadline ? "text-amber-400" : "text-white/80"}`}
-                            style={item.isHeadline ? { fontFamily: "'Playfair Display',Georgia,serif", fontSize: "1rem" } : undefined}>
-                            {item.title}
-                            {item.isHeadline && (
-                              <span className="ml-2 text-[9px] font-black bg-amber-400/15 border border-amber-400/25 text-amber-400 px-2 py-0.5 rounded-full tracking-wider align-middle">
-                                HEADLINE
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-white/30 text-xs">{item.detail}</div>
-                        </div>
-                      </div>
+                  <div className="flex gap-2 mt-3">
+                    {[
+                      { label:"WhatsApp", fn:()=>window.open(`https://wa.me/?text=${encodeURIComponent(ev.title+" "+shareLink)}`,"_blank"), bg:"#25D366" },
+                      { label:"Twitter",  fn:()=>window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(ev.title)}&url=${encodeURIComponent(shareLink)}`,"_blank"), bg:"#000" },
+                    ].map(s => (
+                      <button key={s.label} onClick={s.fn}
+                        className="flex-1 text-[11px] font-bold text-white py-2 rounded-lg transition-all hover:opacity-85"
+                        style={{ background:s.bg }}>
+                        {s.label}
+                      </button>
                     ))}
                   </div>
-                )}
-
-                {/* FAQ */}
-                {activeTab === "faq" && (
-                  <div className="fade-up">
-                    {e.faqs.map((f, i) => <FaqItem key={i} q={f.q} a={f.a} />)}
-                  </div>
-                )}
-              </div>
-
-              {/* Venue */}
-              <div>
-                <h3 className="text-white font-black text-base mb-4" style={{ fontFamily: "'Playfair Display',Georgia,serif" }}>
-                  Venue
-                </h3>
-                <div className="bg-white/3 border border-white/7 rounded-2xl overflow-hidden">
-                  <div className="relative h-44 bg-[#0f111a] flex items-center justify-center overflow-hidden">
-                    <svg className="absolute inset-0 w-full h-full opacity-[0.06]" xmlns="http://www.w3.org/2000/svg">
-                      <defs>
-                        <pattern id="vg" width="40" height="40" patternUnits="userSpaceOnUse">
-                          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5"/>
-                        </pattern>
-                      </defs>
-                      <rect width="100%" height="100%" fill="url(#vg)"/>
-                    </svg>
-                    <div className="relative flex flex-col items-center z-10">
-                      <div className="w-11 h-11 rounded-2xl bg-amber-400/12 border border-amber-400/22 flex items-center justify-center mb-3">
-                        <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
-                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
-                        </svg>
-                      </div>
-                      <div className="text-white/65 text-sm font-semibold">{e.venue}</div>
-                      <div className="text-white/25 text-xs mt-1">{e.latitude.toFixed(4)}°N · {e.longitude.toFixed(4)}°E</div>
-                    </div>
-                  </div>
-                  <div className="px-4 py-3.5 flex items-center justify-between">
-                    <div>
-                      <div className="text-white/70 text-sm font-semibold">{e.venue}</div>
-                      <div className="text-white/28 text-xs mt-0.5">New Delhi, India</div>
-                    </div>
-                    <a href={`https://maps.google.com/?q=${e.latitude},${e.longitude}`} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-400/10 border border-amber-400/18 px-3.5 py-2 rounded-xl hover:bg-amber-400/18 transition-all">
-                      Open Maps
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
-                        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                    </a>
-                  </div>
                 </div>
               </div>
             </div>
-
-            {/* ────────────── RIGHT SIDEBAR ────────────── */}
-            <div className="lg:w-[300px] xl:w-[320px] flex-shrink-0">
-              <div className="lg:sticky lg:top-20 space-y-5">
-
-                {/* Quick info card */}
-                <div className="bg-[#13151f] border border-white/9 rounded-2xl p-5 space-y-4">
-                  <div className="text-white/25 text-[10px] font-black uppercase tracking-[0.16em]">Event Details</div>
-
-                  {[
-                    { icon: <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>, label: "Date",     val: fmtShort(e.date) },
-                    { icon: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,                                                                                                     label: "Time",     val: fmtTime(e.date) },
-                    { icon: <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></>,                                                                                   label: "Venue",    val: e.venue.split(",")[0] },
-                    { icon: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></>,               label: "Going",    val: `${e.attendance.toLocaleString()}+` },
-                    { icon: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,                                                                                                                  label: "Age",      val: "18+ only" },
-                    { icon: <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></>,                                                                         label: "Entry",    val: "Paid event" },
-                  ].map(row => (
-                    <div key={row.label} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5 text-white/28">
-                        <svg className="w-3.5 h-3.5 text-amber-400/50 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">{row.icon}</svg>
-                        <span className="text-xs font-semibold">{row.label}</span>
-                      </div>
-                      <span className="text-white/65 text-xs font-bold text-right max-w-[52%] leading-snug">{row.val}</span>
-                    </div>
-                  ))}
-
-                  {/* RSVP button inside sidebar too */}
-                  <div className="pt-2 border-t border-white/6">
-                    <button onClick={() => setRsvpDone(r => !r)}
-                      className={`rsvp-glow w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all duration-300 hover:scale-[1.02] active:scale-[0.97] ${
-                        rsvpDone
-                          ? "bg-emerald-500/20 border border-emerald-400/35 text-emerald-300"
-                          : "bg-gradient-to-r from-amber-400 to-orange-500 text-[#0d0f17]"
-                      }`}>
-                      {rsvpDone ? (
-                        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>You're going!</>
-                      ) : (
-                        <>RSVP to this event<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg></>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Attendee faces */}
-                <div className="bg-white/3 border border-white/7 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-white/45 text-xs font-bold">Attendees</span>
-                    <span className="text-white/25 text-xs">{e.attendance.toLocaleString()} going</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="flex -space-x-2">
-                      {Array.from({ length: 8 }, (_, i) => (
-                        <img key={i} src={`https://i.pravatar.cc/32?img=${i + 5}`} alt=""
-                          className="w-8 h-8 rounded-full object-cover ring-2 ring-[#0d0f17]" />
-                      ))}
-                    </div>
-                    <div className="ml-3 flex flex-col">
-                      <span className="text-white/55 text-xs font-semibold">+{(e.attendance - 8).toLocaleString()} more</span>
-                      <span className="text-white/25 text-[10px]">have RSVP'd</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Related events */}
-                <div>
-                  <div className="text-white/25 text-[10px] font-black uppercase tracking-[0.16em] mb-3.5 px-0.5">
-                    More like this
-                  </div>
-                  <div className="space-y-2">
-                    {e.relatedEvents.map(ev => <RelatedCard key={ev.id} ev={ev} />)}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-white/5 py-7 px-5 mt-4">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white">
-                  <rect x="3" y="4" width="18" height="18" rx="2"/>
-                  <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
-              </div>
-              <span className="text-white/20 text-xs font-semibold">eventimist © 2025</span>
-            </div>
-            <div className="flex items-center gap-5 text-white/20 text-xs font-semibold">
-              {["Privacy", "Terms", "Help"].map(l => (
-                <a key={l} href="#" className="hover:text-white/45 transition-colors">{l}</a>
-              ))}
-            </div>
-          </div>
-        </div>
+        <div className="h-12"/>
       </div>
     </>
   );

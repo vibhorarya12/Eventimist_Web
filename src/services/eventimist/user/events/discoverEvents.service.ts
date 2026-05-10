@@ -15,7 +15,8 @@ export interface DiscoverEvent {
   id:             number;
   title:          string;
   description:    string;
-  category:       string;      // "TECH" | "MUSIC" | ... (uppercase enum)
+  category:       string;
+  slug:           string;
   startTime:      string;      // ISO 8601 e.g. "2026-04-20T18:00:00"
   timezone:       string;      // e.g. "Asia/Kolkata"
   mode:           "ONLINE" | "OFFLINE" | "HYBRID";
