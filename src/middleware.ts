@@ -1,111 +1,98 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// ─── Route definitions ────────────────────────────────────────────────────────
-
-// Routes that require an organizer to be logged in
+// ─── Organizer routes ─────────────────────────────────────────────────────────
 const ORGANIZER_PROTECTED = [
   "/organizer/dashboard",
   "/organizer/create-event",
+  "/organizer/update-event",
+  "/organizer/preview-event",
 ];
+const ORGANIZER_AUTH_ROUTES = ["/organizer/auth"];
+const ORGANIZER_PASSTHROUGH = ["/organizer/auth/oauth-callback", "/oauth-confirm"];
 
-// Routes that a logged-in organizer should NOT be able to visit
-// (e.g. going back to /organizer/auth after already logged in)
-const ORGANIZER_AUTH_ROUTES = [
-  "/organizer/auth",
+// ─── User routes ──────────────────────────────────────────────────────────────
+// Routes that require a logged-in user
+const USER_PROTECTED = [
+  "/user/profile",
+  "/user/volunteer",
 ];
+// Routes a logged-in user should not revisit (auth page)
+const USER_AUTH_ROUTES = ["/user/auth"];
 
-// ─── Token extractor ──────────────────────────────────────────────────────────
-// Zustand persist stores data as:
-// localStorage["organizer-auth"] = { state: { accessToken: "..." }, version: 0 }
-//
-// In middleware we are on the Next.js edge — no access to localStorage.
-// The cleanest solution: read a lightweight cookie that you set on the client
-// side whenever the accessToken changes (see note below).
-//
-// Cookie name must match what you set from the client.
-const ORGANIZER_TOKEN_COOKIE = "organizer-token";
-
+// ─── Token extractors ─────────────────────────────────────────────────────────
 function getOrganizerToken(req: NextRequest): string | null {
-  return req.cookies.get(ORGANIZER_TOKEN_COOKIE)?.value ?? null;
+  return req.cookies.get("organizer-token")?.value ?? null;
+}
+function getUserToken(req: NextRequest): string | null {
+  return req.cookies.get("user-token")?.value ?? null;
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // ── Always pass through OAuth callbacks ────────────────────────────────────
+  if (ORGANIZER_PASSTHROUGH.some(r => pathname.startsWith(r)))
+    return NextResponse.next();
+
   const organizerToken = getOrganizerToken(req);
+  const userToken      = getUserToken(req);
 
-  // ── Organizer protected routes ─────────────────────────────────────────────
-  const isOrganizerProtected = ORGANIZER_PROTECTED.some((route) =>
-    pathname.startsWith(route)
-  );
+  // ══ ORGANIZER GUARDS ══════════════════════════════════════════════════════
 
-  if (isOrganizerProtected && !organizerToken) {
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/organizer/auth";
-    // Preserve the intended destination so you can redirect back after login
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+  // Protected → no token → redirect to auth
+  if (ORGANIZER_PROTECTED.some(r => pathname.startsWith(r)) && !organizerToken) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/organizer/auth";
+    url.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(url);
   }
 
-  // ── Organizer auth routes (block if already logged in) ─────────────────────
-  const isOrganizerAuthRoute = ORGANIZER_AUTH_ROUTES.some((route) =>
-    pathname.startsWith(route)
-  );
+  // Auth route → already logged in → redirect to dashboard
+  if (ORGANIZER_AUTH_ROUTES.some(r => pathname.startsWith(r)) && organizerToken) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/organizer/dashboard";
+    url.search   = "";
+    return NextResponse.redirect(url);
+  }
 
-  if (isOrganizerAuthRoute && organizerToken) {
-    const dashboardUrl = req.nextUrl.clone();
-    dashboardUrl.pathname = "/organizer/dashboard";
-    dashboardUrl.search = "";
-    return NextResponse.redirect(dashboardUrl);
+  // ══ USER GUARDS ═══════════════════════════════════════════════════════════
+
+  const isUserRoot = pathname === "/user" || pathname === "/user/";
+
+  // Protected → no token → redirect to /user/auth (auth page)
+  if (USER_PROTECTED.some(r => pathname.startsWith(r)) && !userToken) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/user/auth";
+    url.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // /user root → no token → redirect to /user/auth
+  if (isUserRoot && !userToken) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/user/auth";
+    return NextResponse.redirect(url);
+  }
+
+  // Any /user route → already logged in → redirect to /user/profile
+  if (pathname.startsWith("/user") && userToken && pathname !== "/user/profile") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/user/profile";
+    url.search   = "";
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
+
 }
 
 // ─── Matcher ──────────────────────────────────────────────────────────────────
-// Only run middleware on these paths — keeps edge function fast.
-// Static files, _next internals, and public assets are automatically excluded.
 export const config = {
   matcher: [
     "/organizer/:path*",
+    "/user",          // exact — auth page
+    "/user/",         // trailing slash variant
+    "/user/:path+",   // sub-pages: /user/profile, /user/volunteer etc
   ],
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// IMPORTANT — How to bridge localStorage → cookie for middleware
-//
-// Next.js middleware runs on the edge and cannot read localStorage.
-// You need to mirror the accessToken into a plain (non-httpOnly) cookie
-// whenever it changes. Do this in a single place — a custom hook:
-//
-//   // src/hooks/useSyncAuthCookie.ts
-//   import { useEffect } from "react";
-//   import { useOrganizerAuth } from "@/store/eventimist/organizer/auth/AuthState";
-//
-//   export function useSyncAuthCookie() {
-//     const accessToken = useOrganizerAuth((s) => s.accessToken);
-//
-//     useEffect(() => {
-//       if (accessToken) {
-//         document.cookie = `organizer-token=${accessToken}; path=/; SameSite=Strict`;
-//       } else {
-//         // Clear cookie on logout
-//         document.cookie = "organizer-token=; path=/; max-age=0";
-//       }
-//     }, [accessToken]);
-//   }
-//
-// Call this hook once in your root layout or organizer layout:
-//
-//   // src/app/organizer/layout.tsx
-//   "use client";
-//   import { useSyncAuthCookie } from "@/hooks/useSyncAuthCookie";
-//   export default function OrganizerLayout({ children }) {
-//     useSyncAuthCookie();
-//     return <>{children}</>;
-//   }
-//
-// This cookie is NOT httpOnly — it is readable by JS and by the middleware.
-// It exists purely as a signal for the edge redirect. The real token lives
-// in Zustand and is read via useOrganizerAuth() or getState() for API calls.
-// ─────────────────────────────────────────────────────────────────────────────
