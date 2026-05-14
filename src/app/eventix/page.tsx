@@ -1,471 +1,453 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// src/app/eventix/page.tsx
 
-// ─── Org logos for marquee ────────────────────────────────────────────────────
-const ORG_LOGOS = [
-  { name: "TechCorp India",    abbr: "TC", color: "bg-blue-600"    },
-  { name: "GreenEarth NGO",   abbr: "GE", color: "bg-emerald-600" },
-  { name: "MedCare Trust",    abbr: "MC", color: "bg-rose-600"    },
-  { name: "EduSphere",        abbr: "ES", color: "bg-violet-600"  },
-  { name: "NexGen Solutions", abbr: "NG", color: "bg-amber-600"   },
-  { name: "CitizenFirst",     abbr: "CF", color: "bg-teal-600"    },
-  { name: "ArtHouse Delhi",   abbr: "AH", color: "bg-pink-600"    },
-  { name: "SportZone",        abbr: "SZ", color: "bg-orange-600"  },
-  { name: "FinCore Ltd",      abbr: "FC", color: "bg-indigo-600"  },
-  { name: "UrbanRoots",       abbr: "UR", color: "bg-lime-600"    },
+import { useEffect, useRef, useState, useCallback } from "react";
+
+// ─── Theme tokens ─────────────────────────────────────────────────────────────
+const LIGHT = {
+  bg:       "#f5f0e8",
+  bgAlt:    "#ede8de",
+  surface:  "#ffffff",
+  ink:      "#1a1612",
+  ink2:     "#5c5346",
+  ink3:     "#9c9186",
+  border:   "rgba(26,22,18,.1)",
+  gold:     "#b8922a",
+  goldBg:   "rgba(184,146,42,.08)",
+  goldBdr:  "rgba(184,146,42,.25)",
+  wall:     "#ede8de",   // carousel wall
+  pin:      "#8c7355",
+  shadow:   "rgba(0,0,0,.18)",
+};
+const DARK = {
+  bg:       "#18160f",
+  bgAlt:    "#1f1c14",
+  surface:  "#24211a",
+  ink:      "#f0ead8",
+  ink2:     "#b0a890",
+  ink3:     "#6e6658",
+  border:   "rgba(240,234,216,.08)",
+  gold:     "#d4a843",
+  goldBg:   "rgba(212,168,67,.08)",
+  goldBdr:  "rgba(212,168,67,.2)",
+  wall:     "#1f1c14",
+  pin:      "#b0a890",
+  shadow:   "rgba(0,0,0,.55)",
+};
+
+// ─── Carousel images & captions ───────────────────────────────────────────────
+const GALLERY = [
+  { url:"https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&q=80", caption:"All-hands · TechCorp 2024",        tag:"Corporate" },
+  { url:"https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=600&q=80", caption:"Keynote · EdSphere Summit",        tag:"Conference"},
+  { url:"https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=600&q=80", caption:"Yamuna Drive · CitizenFirst",        tag:"Volunteer" },
+  { url:"https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=600&q=80", caption:"UX Meetup · DesignDelhi #22",      tag:"Networking"},
+  { url:"https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=600&q=80", caption:"Volunteer Day · GreenEarth",       tag:"Community" },
+  { url:"https://images.unsplash.com/photo-1556761175-b413da4baf72?w=600&q=80", caption:"Founders Bootcamp · NexGen",         tag:"Business"  },
 ];
 
-// ─── Eye toggle icon ──────────────────────────────────────────────────────────
+// Slight tilts per card — feels like real prints pinned to a wall
+const TILTS = [-2.5, 1.8, -1.2, 2.8, -0.8, 1.5];
+
+// ─── Org tiles ────────────────────────────────────────────────────────────────
+const ORGS = [
+  { name:"TechCorp India",   abbr:"TC", h:210 },
+  { name:"GreenEarth NGO",  abbr:"GE", h:150 },
+  { name:"MedCare Trust",   abbr:"MC", h:350 },
+  { name:"EduSphere",       abbr:"ES", h:270 },
+  { name:"NexGen Solutions",abbr:"NG", h:38  },
+  { name:"CitizenFirst",    abbr:"CF", h:175 },
+  { name:"ArtHouse Delhi",  abbr:"AH", h:320 },
+  { name:"SportZone",       abbr:"SZ", h:25  },
+];
+
+// ─── Shared UI ────────────────────────────────────────────────────────────────
 function Eye({ open }: { open: boolean }) {
-  return open ? (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-      <line x1="1" y1="1" x2="23" y2="23"/>
-    </svg>
-  ) : (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
-  );
+  return open
+    ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+    : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
 }
 
-// ─── Input (dark themed) ──────────────────────────────────────────────────────
-function DarkInput({ icon, type = "text", value, onChange, placeholder, required, mono, prefix }: {
-  icon?: React.ReactNode; type?: string; value: string;
-  onChange: (v: string) => void; placeholder: string;
-  required?: boolean; mono?: boolean; prefix?: string;
-}) {
-  const [show, setShow] = useState(false);
-  const isPassword = type === "password";
-  return (
-    <div className="relative">
-      {prefix && (
-        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25 text-sm font-mono select-none">{prefix}</span>
-      )}
-      {icon && !prefix && (
-        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none">{icon}</span>
-      )}
-      <input
-        type={isPassword ? (show ? "text" : "password") : type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        required={required}
-        className={`w-full py-3 bg-white/5 border border-white/10 hover:border-white/20 focus:border-teal-500/50 focus:bg-white/8 focus:ring-4 focus:ring-teal-500/10 rounded-xl text-sm text-white/80 placeholder:text-white/20 outline-none transition-all ${prefix ? "pl-8 pr-4" : icon ? "pl-10 pr-4" : "px-4"} ${isPassword ? "pr-10" : ""} ${mono ? "font-mono" : ""}`}
-      />
-      {isPassword && (
-        <button type="button" onClick={() => setShow(v => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/60 transition-colors">
-          <Eye open={show} />
-        </button>
-      )}
-    </div>
-  );
-}
+// ─── Wall-Hanging Carousel ─────────────────────────────────────────────────────
+function WallCarousel({ tk }: { tk: typeof LIGHT }) {
+  const [idx, setIdx] = useState(0);
+  const timer = useRef<ReturnType<typeof setTimeout>|null>(null);
 
-function Label({ children }: { children: React.ReactNode }) {
-  return <label className="block text-[10px] font-bold text-white/35 mb-1.5 tracking-widest uppercase">{children}</label>;
-}
-
-// ─── Nav ──────────────────────────────────────────────────────────────────────
-function Nav() {
-  const [scrolled, setScrolled]     = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    const h = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", h);
-    return () => window.removeEventListener("scroll", h);
+  const go = useCallback((i: number) => {
+    setIdx(i);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setIdx(j => (j+1)%GALLERY.length), 4500);
   }, []);
 
-  return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "bg-[#060d1f]/95 backdrop-blur-xl border-b border-white/5 py-3" : "py-5"}`}>
-      <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-        <a href="/eventix" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/30">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white">
-              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-              <polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-          </div>
-          <span className="text-white font-black text-xl tracking-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>eventix</span>
-          <span className="text-teal-400 font-black text-xl tracking-tight">space</span>
-          <span className="hidden sm:block text-[10px] font-bold tracking-widest uppercase text-white/20 border border-white/8 rounded-full px-2 py-0.5 ml-1">by eventimist</span>
-        </a>
-
-        <div className="hidden md:flex items-center gap-8 text-sm text-white/45 font-medium">
-          {["Features", "Pricing", "Domains"].map(l => (
-            <a key={l} href={`#${l.toLowerCase()}`} className="hover:text-white transition-colors">{l}</a>
-          ))}
-        </div>
-
-        <div className="hidden md:flex items-center gap-3">
-          <a href="#auth" className="text-sm text-white/50 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-white/5">Sign In</a>
-          <a href="#auth" className="text-sm font-bold bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-[#060d1f] px-5 py-2.5 rounded-xl transition-all hover:shadow-lg hover:shadow-teal-500/25 hover:scale-[1.02]">
-            Register Org
-          </a>
-        </div>
-
-        <button onClick={() => setMobileOpen(v => !v)} className="md:hidden text-white/50 p-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-            {mobileOpen
-              ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-              : <><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>}
-          </svg>
-        </button>
-      </div>
-
-      {mobileOpen && (
-        <div className="md:hidden bg-[#0b1630] border-t border-white/5 px-6 py-4 flex flex-col gap-3">
-          {["Features","Pricing","Domains"].map(l => (
-            <a key={l} href={`#${l.toLowerCase()}`} className="text-white/50 hover:text-white text-sm py-2">{l}</a>
-          ))}
-          <div className="flex gap-3 mt-1">
-            <a href="#auth" className="flex-1 text-center text-sm border border-white/10 text-white/50 rounded-xl py-2.5">Sign In</a>
-            <a href="#auth" className="flex-1 text-center text-sm font-bold bg-gradient-to-r from-teal-400 to-cyan-500 text-[#060d1f] rounded-xl py-2.5">Register Org</a>
-          </div>
-        </div>
-      )}
-    </nav>
-  );
-}
-
-// ─── Hero ─────────────────────────────────────────────────────────────────────
-function Hero() {
-  const [vis, setVis] = useState(false);
-  useEffect(() => { setTimeout(() => setVis(true), 80); }, []);
+  useEffect(() => {
+    timer.current = setTimeout(() => go((idx+1)%GALLERY.length), 4500);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [idx, go]);
 
   return (
-    <section className="relative min-h-screen flex items-center pt-28 pb-20 px-6 overflow-hidden">
-      <div className="absolute inset-0 bg-[#060d1f]" />
-      {/* Grid */}
-      <div className="absolute inset-0 opacity-[0.06]" style={{
-        backgroundImage: "linear-gradient(rgba(45,212,191,1) 1px,transparent 1px),linear-gradient(90deg,rgba(45,212,191,1) 1px,transparent 1px)",
-        backgroundSize: "72px 72px"
-      }} />
-      {/* Glow */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-teal-500/8 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-80 h-80 bg-cyan-600/6 rounded-full blur-3xl pointer-events-none" />
+    <div className="relative py-10 overflow-visible select-none">
+      {/* String line */}
+      <div className="absolute left-0 right-0 pointer-events-none"
+        style={{ top:18, height:2, background:`linear-gradient(90deg,transparent,${tk.pin}55 15%,${tk.pin}88 50%,${tk.pin}55 85%,transparent)` }}/>
 
-      <div className="relative z-10 max-w-7xl mx-auto w-full">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
-          {/* Left */}
-          <div>
-            <div className={`transition-all duration-700 delay-100 ${vis ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-              <span className="inline-flex items-center gap-2 border border-teal-500/30 bg-teal-500/8 rounded-full px-4 py-1.5 text-xs font-bold text-teal-400 tracking-widest uppercase mb-8">
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-                Organisation-first Event Space
-              </span>
-            </div>
-            <h1 className={`transition-all duration-700 delay-200 ${vis ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-              <span className="block text-white text-6xl lg:text-7xl font-black leading-[0.93] tracking-tight">Your Org's</span>
-              <span className="block text-6xl lg:text-7xl font-black leading-[0.93] tracking-tight bg-gradient-to-r from-teal-400 via-cyan-400 to-sky-400 bg-clip-text text-transparent">Exclusive</span>
-              <span className="block text-white text-6xl lg:text-7xl font-black leading-[0.93] tracking-tight">Event Space</span>
-            </h1>
-            <p className={`mt-8 text-white/45 text-lg leading-relaxed max-w-lg transition-all duration-700 delay-300 ${vis ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-              A private, domain-verified hub where organisations host events and members join automatically — no invite chaos, no outsiders.
-            </p>
-            <div className={`mt-10 flex flex-wrap gap-4 transition-all duration-700 delay-[400ms] ${vis ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-              <a href="#auth" className="group flex items-center gap-3 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-[#060d1f] font-black px-8 py-4 rounded-2xl transition-all hover:shadow-2xl hover:shadow-teal-500/25 hover:scale-[1.02] text-base">
-                Register Your Organisation
-                <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-              </a>
-              <a href="#auth" className="flex items-center gap-3 border border-white/12 hover:border-white/25 text-white/70 hover:text-white font-semibold px-8 py-4 rounded-2xl transition-all hover:bg-white/4 text-base">
-                Sign In
-              </a>
-            </div>
-            {/* Domain badge */}
-            <div className={`mt-10 inline-flex items-center gap-3 bg-white/4 border border-white/8 rounded-2xl px-5 py-3 transition-all duration-700 delay-500 ${vis ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-              <div className="w-8 h-8 rounded-lg bg-teal-500/15 flex items-center justify-center">
-                <svg className="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                  <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                </svg>
-              </div>
-              <div>
-                <div className="text-white/75 text-xs font-bold">Domain-verified Access</div>
-                <div className="text-white/30 text-[10px] mt-0.5">Only <span className="text-teal-400 font-mono">@yourorg.com</span> emails can join</div>
-              </div>
-            </div>
-          </div>
+      {/* Cards */}
+      <div className="flex items-start justify-center gap-5 flex-wrap sm:flex-nowrap overflow-visible px-4">
+        {GALLERY.map((g, i) => {
+          const active  = i === idx;
+          const tilt    = TILTS[i];
+          const scale   = active ? 1.06 : 0.95;
+          const zIdx    = active ? 10 : 1;
+          const brightness = active ? 1 : 0.7;
 
-          {/* Right — dashboard mockup */}
-          <div className={`transition-all duration-1000 delay-400 ${vis ? "opacity-100 translate-x-0" : "opacity-0 translate-x-12"}`}>
-            <DashboardMockup />
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+          return (
+            <div key={i} onClick={() => go(i)}
+              className="relative flex-shrink-0 cursor-pointer transition-all duration-500"
+              style={{
+                width: active ? 200 : 160,
+                transform:`rotate(${tilt}deg) scale(${scale})`,
+                zIndex: zIdx,
+                filter:`brightness(${brightness})`,
+              }}>
+              {/* Pin/clip */}
+              <div className="absolute left-1/2 -translate-x-1/2 -top-2.5 z-10 flex flex-col items-center">
+                <div className="w-2 h-2 rounded-full border" style={{ background:tk.pin, borderColor:tk.ink3, boxShadow:`0 1px 3px ${tk.shadow}` }}/>
+                <div className="w-px h-3" style={{ background:tk.pin+"80" }}/>
+              </div>
 
-function DashboardMockup() {
-  return (
-    <div className="relative">
-      <div className="absolute inset-0 bg-teal-500/8 rounded-3xl blur-2xl scale-105 pointer-events-none" />
-      <div className="relative bg-[#0b1630] border border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-black/50">
-        {/* Titlebar */}
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-white/6 bg-white/2">
-          <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60" />
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
-          <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-          <div className="flex-1 mx-3 bg-white/4 rounded-md px-3 py-1 text-[10px] text-white/25 font-mono">eventimist.com/eventix/techcorp</div>
-          <div className="w-5 h-5 rounded bg-teal-500/20 flex items-center justify-center">
-            <svg className="w-3 h-3 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          </div>
-        </div>
-        <div className="p-6">
-          {/* Org header */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-xs font-black text-white">TC</div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-white font-bold text-sm">TechCorp India</span>
-                  <span className="text-[9px] font-bold text-teal-400 bg-teal-400/10 px-1.5 py-0.5 rounded-full">✓ Verified</span>
+              {/* Photo print */}
+              <div className="overflow-hidden rounded-sm"
+                style={{
+                  background: tk.surface,
+                  boxShadow: active
+                    ? `0 16px 40px ${tk.shadow}, 0 4px 8px ${tk.shadow}`
+                    : `0 6px 20px ${tk.shadow}`,
+                  padding: "8px 8px 28px 8px",
+                }}>
+                <img src={g.url} alt={g.caption}
+                  className="w-full object-cover rounded-sm"
+                  style={{ height: active ? 160 : 130, display:"block" }}
+                  loading="lazy"
+                />
+                {/* Caption strip */}
+                <div className="pt-2 px-0.5">
+                  <p className="text-center leading-snug"
+                    style={{ fontFamily:"'Caveat',cursive", fontSize:11, color:tk.ink2 }}>
+                    {g.caption}
+                  </p>
                 </div>
-                <div className="text-white/30 text-[10px]">@techcorp.in · Admin Panel</div>
               </div>
+
+              {/* Tag badge on active */}
+              {active && (
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full transition-all"
+                  style={{ background:tk.goldBg, border:`1px solid ${tk.goldBdr}`, color:tk.gold, fontFamily:"'Libre Baskerville',Georgia,serif" }}>
+                  {g.tag}
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-6 h-6 rounded-full bg-teal-500/20 border border-teal-500/30 flex items-center justify-center">
-                <svg className="w-3 h-3 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </div>
-              <span className="text-white/40 text-[10px]">Admin</span>
-            </div>
-          </div>
-          {/* Events */}
-          <div className="space-y-2 mb-5">
-            {[
-              { title: "Annual Tech Summit", date: "Mar 28", n: 87, tag: "Conference", c: "bg-blue-500/20 text-blue-400" },
-              { title: "Q1 All-Hands",       date: "Apr 2",  n: 212, tag: "Internal",    c: "bg-violet-500/20 text-violet-400" },
-              { title: "CSR Volunteer Drive", date: "Apr 10", n: 45, tag: "Volunteer",   c: "bg-emerald-500/20 text-emerald-400" },
-            ].map((e, i) => (
-              <div key={i} className="flex items-center gap-3 bg-white/3 border border-white/5 rounded-xl px-3 py-2.5 hover:bg-white/5 transition-colors cursor-pointer">
-                <div className="w-7 h-7 rounded-lg bg-teal-500/15 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-white/80 text-xs font-semibold truncate">{e.title}</div>
-                  <div className="text-white/25 text-[9px]">{e.date} · {e.n} attending</div>
-                </div>
-                <span className={`text-[8px] font-black tracking-wide uppercase px-1.5 py-0.5 rounded-full ${e.c}`}>{e.tag}</span>
-              </div>
-            ))}
-          </div>
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-2">
-            {[{ v: "12", l: "Events" }, { v: "340", l: "Members" }, { v: "94%", l: "Attendance" }].map((s, i) => (
-              <div key={i} className="bg-white/3 rounded-xl p-2.5 text-center border border-white/4">
-                <div className="text-teal-400 font-black text-lg" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{s.v}</div>
-                <div className="text-white/25 text-[9px]">{s.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+          );
+        })}
       </div>
-      <div className="absolute -top-4 -right-4 bg-[#0b1630] border border-teal-500/25 rounded-2xl px-4 py-3 shadow-xl flex items-center gap-2">
-        <div className="w-6 h-6 rounded-full bg-teal-400/15 flex items-center justify-center">
-          <svg className="w-3 h-3 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-        </div>
-        <div>
-          <div className="text-white text-xs font-bold">Domain Verified</div>
-          <div className="text-teal-400/60 text-[9px] font-mono">@techcorp.in</div>
-        </div>
-      </div>
-      <div className="absolute -bottom-4 -left-4 bg-[#0b1630] border border-white/8 rounded-2xl px-4 py-3 shadow-xl flex items-center gap-2">
-        <div className="flex -space-x-1.5">
-          {["bg-teal-500","bg-blue-500","bg-violet-500"].map((c,i) => (
-            <div key={i} className={`w-5 h-5 rounded-full ${c} border-2 border-[#0b1630] flex items-center justify-center text-[7px] font-bold text-white`}>{["R","S","T"][i]}</div>
-          ))}
-        </div>
-        <div>
-          <div className="text-white text-xs font-bold">+18 joined today</div>
-          <div className="text-white/30 text-[9px]">via @techcorp.in</div>
-        </div>
+
+      {/* Dot nav */}
+      <div className="flex justify-center gap-1.5 mt-10">
+        {GALLERY.map((_,i) => (
+          <button key={i} onClick={() => go(i)}
+            className="rounded-full transition-all duration-300"
+            style={{
+              width: i===idx ? 20 : 6, height: 6,
+              background: i===idx ? tk.gold : tk.ink3+"50",
+            }}/>
+        ))}
       </div>
     </div>
   );
 }
 
-// ─── Org marquee ──────────────────────────────────────────────────────────────
-function OrgMarquee() {
+// ─── Field & Input components ─────────────────────────────────────────────────
+function Field({ label, note, tk, children }: { label:string; note?:string; tk:typeof LIGHT; children:React.ReactNode }) {
   return (
-    <section className="py-10 border-y border-white/5 bg-[#060d1f] overflow-hidden">
-      <p className="text-center text-white/20 text-[10px] font-bold tracking-widest uppercase mb-6">Trusted by organisations across India</p>
-      <div className="flex gap-5 org-marquee" style={{ width: "max-content" }}>
-        {[...ORG_LOGOS, ...ORG_LOGOS, ...ORG_LOGOS].map((o, i) => (
-          <div key={i} className="flex items-center gap-3 bg-white/3 border border-white/6 rounded-2xl px-4 py-2.5 flex-shrink-0 hover:bg-white/6 transition-colors">
-            <div className={`w-7 h-7 rounded-md ${o.color} flex items-center justify-center text-[10px] font-black text-white`}>{o.abbr}</div>
-            <span className="text-white/40 text-xs font-semibold whitespace-nowrap">{o.name}</span>
-          </div>
-        ))}
-      </div>
-    </section>
+    <div>
+      <label style={{ display:"block", fontSize:9, fontWeight:800, letterSpacing:"0.2em", textTransform:"uppercase", color:tk.ink3, marginBottom:6, fontFamily:"'Barlow Condensed',sans-serif" }}>
+        {label}
+      </label>
+      {children}
+      {note && <p style={{ fontSize:10, color:tk.ink3, marginTop:4, fontFamily:"'Libre Baskerville',serif" }}>{note}</p>}
+    </div>
   );
 }
 
-// ─── How it works ─────────────────────────────────────────────────────────────
-function HowItWorks() {
-  const steps = [
-    { num:"01", icon:"🏛️", title:"Register Your Org", desc:"Submit your org name, official domain, and category. Verified within 24 hours.", tag:"Org Admin" },
-    { num:"02", icon:"🔐", title:"Domain Verification", desc:"Only @yourorg.com emails can access your private Eventix Space. Zero intruders.", tag:"Auto-secured" },
-    { num:"03", icon:"📅", title:"Create Events", desc:"Admin posts internal or public events from the dashboard. Set RSVP limits and visibility.", tag:"Org Admin" },
-    { num:"04", icon:"👥", title:"Members Auto-join", desc:"Any member signing in with the org email is instantly verified — no invite links.", tag:"Members" },
-  ];
+function TInput({ type="text", value, onChange, placeholder, required, mono, prefix, tk }: {
+  type?:string; value:string; onChange:(v:string)=>void; placeholder:string;
+  required?:boolean; mono?:boolean; prefix?:string; tk:typeof LIGHT;
+}) {
+  const [show, setShow] = useState(false);
+  const isPass = type === "password";
   return (
-    <section className="py-24 px-6 bg-[#060d1f]" id="features">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <span className="text-teal-400 text-sm font-bold tracking-widest uppercase">How It Works</span>
-          <h2 className="mt-4 text-white text-5xl font-black" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-            Up and running<br /><span className="text-white/20">in four steps</span>
-          </h2>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {steps.map((s, i) => (
-            <div key={i} className="relative group">
-              {i < 3 && <div className="hidden lg:block absolute top-10 left-[65%] w-full h-px border-t border-dashed border-white/8 z-0" />}
-              <div className="relative z-10 bg-white/3 border border-white/7 hover:border-teal-500/30 hover:bg-teal-500/4 rounded-3xl p-6 transition-all duration-300 hover:-translate-y-2 h-full">
-                <div className="flex items-start justify-between mb-5">
-                  <span className="text-4xl">{s.icon}</span>
-                  <span className="text-2xl font-black text-white/6 font-mono">{s.num}</span>
-                </div>
-                <span className="text-[9px] font-bold tracking-widest uppercase text-teal-400/60 mb-2 block">{s.tag}</span>
-                <h3 className="text-white font-bold text-base leading-snug mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{s.title}</h3>
-                <p className="text-white/35 text-sm leading-relaxed">{s.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+    <div style={{ position:"relative" }}>
+      {prefix && <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, color:tk.ink3, fontFamily:"monospace" }}>{prefix}</span>}
+      <input
+        type={isPass ? (show?"text":"password") : type}
+        value={value} onChange={e=>onChange(e.target.value)}
+        placeholder={placeholder} required={required}
+        style={{
+          width:"100%", padding:"10px 14px", paddingLeft: prefix?"28px":"14px", paddingRight: isPass?"36px":"14px",
+          background: tk.bgAlt, border:`1.5px solid ${tk.border}`,
+          borderRadius:10, fontSize:13, color:tk.ink,
+          fontFamily: mono?"monospace":"'Libre Baskerville',Georgia,serif",
+          outline:"none", transition:"border-color .2s, background .2s",
+          boxSizing:"border-box",
+        }}
+        onFocus={e => { e.target.style.borderColor = tk.gold; e.target.style.background = tk.surface; }}
+        onBlur={e  => { e.target.style.borderColor = tk.border; e.target.style.background = tk.bgAlt; }}
+      />
+      {isPass && (
+        <button type="button" onClick={()=>setShow(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", color:tk.ink3, background:"none", border:"none", cursor:"pointer", padding:0 }}>
+          <Eye open={show}/>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TBtn({ label, loading, tk }: { label:string; loading?:boolean; tk:typeof LIGHT }) {
+  return (
+    <button type="submit" disabled={loading} style={{
+      width:"100%", padding:"12px 16px",
+      background: tk.gold, color:"#fff",
+      border:"none", borderRadius:10, cursor: loading?"not-allowed":"pointer",
+      fontFamily:"'Barlow Condensed',sans-serif", fontWeight:900, fontSize:13,
+      letterSpacing:"0.12em", textTransform:"uppercase",
+      opacity: loading ? 0.6 : 1, transition:"opacity .2s, filter .2s",
+    }}
+    onMouseOver={e => !loading && ((e.target as HTMLButtonElement).style.filter="brightness(1.1)")}
+    onMouseOut={e  => ((e.target as HTMLButtonElement).style.filter="")}>
+      {loading ? "Processing…" : label}
+    </button>
+  );
+}
+
+// ─── Auth Panel ───────────────────────────────────────────────────────────────
+type AuthTab = "register" | "member" | "admin";
+
+function AuthPanel({ tk }: { tk: typeof LIGHT }) {
+  const [tab,  setTab]  = useState<AuthTab>("register");
+  const [done, setDone] = useState(false);
+
+  if (done) return (
+    <div style={{ textAlign:"center", padding:"32px 24px" }}>
+      <div style={{ width:52, height:52, borderRadius:14, background:tk.goldBg, border:`1.5px solid ${tk.goldBdr}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, margin:"0 auto 16px" }}>✓</div>
+      <h3 style={{ margin:"0 0 8px", fontFamily:"'Spectral',Georgia,serif", fontSize:22, color:tk.ink }}>All set.</h3>
+      <p style={{ margin:"0 0 20px", fontSize:13, color:tk.ink2, fontFamily:"'Libre Baskerville',serif", lineHeight:1.6 }}>Check your inbox to verify domain ownership.</p>
+      <button onClick={()=>setDone(false)} style={{ background:"none", border:"none", cursor:"pointer", color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif", fontWeight:900, letterSpacing:"0.1em", fontSize:12, textTransform:"uppercase" }}>← Back</button>
+    </div>
+  );
+
+  return (
+    <div style={{ borderRadius:18, border:`1.5px solid ${tk.border}`, background:tk.surface, overflow:"hidden", boxShadow:`0 8px 40px ${tk.shadow}` }}>
+      {/* Tabs */}
+      <div style={{ display:"flex", borderBottom:`1.5px solid ${tk.border}` }}>
+        {([["register","Register Org"],["member","Member Login"],["admin","Admin"]] as [AuthTab,string][]).map(([id,lbl]) => (
+          <button key={id} onClick={()=>setTab(id)} style={{
+            flex:1, padding:"12px 8px", background:"none", border:"none", cursor:"pointer",
+            fontFamily:"'Barlow Condensed',sans-serif", fontWeight:900, fontSize:11,
+            letterSpacing:"0.12em", textTransform:"uppercase", transition:"all .2s",
+            color: tab===id ? tk.gold : tk.ink3,
+            borderBottom: tab===id ? `2px solid ${tk.gold}` : "2px solid transparent",
+            marginBottom:-1.5,
+          }}>
+            {lbl}
+          </button>
+        ))}
       </div>
-    </section>
+
+      <div style={{ padding:24 }}>
+        {tab==="register" && <RegisterForm tk={tk} onDone={()=>setDone(true)}/>}
+        {tab==="member"   && <MemberForm   tk={tk} onDone={()=>setDone(true)}/>}
+        {tab==="admin"    && <AdminForm    tk={tk} onDone={()=>setDone(true)}/>}
+      </div>
+    </div>
+  );
+}
+
+function RegisterForm({ tk, onDone }: { tk:typeof LIGHT; onDone:()=>void }) {
+  const [org,setOrg]=useState(""); const [domain,setDomain]=useState("");
+  const [name,setName]=useState(""); const [email,setEmail]=useState("");
+  const [pass,setPass]=useState(""); const [loading,setLoading]=useState(false);
+  const submit=(e:React.FormEvent)=>{ e.preventDefault(); setLoading(true); setTimeout(()=>{setLoading(false);onDone();},1500); };
+  return (
+    <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <Field label="Organisation Name" tk={tk}><TInput value={org} onChange={setOrg} placeholder="TechCorp India" required tk={tk}/></Field>
+      <Field label="Domain" note="Members with this domain auto-join" tk={tk}><TInput value={domain} onChange={setDomain} placeholder="techcorp.com" required mono prefix="@" tk={tk}/></Field>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+        <Field label="Your Name" tk={tk}><TInput value={name} onChange={setName} placeholder="Ravi Kumar" required tk={tk}/></Field>
+        <Field label="Admin Email" tk={tk}><TInput type="email" value={email} onChange={setEmail} placeholder="admin@co.com" required tk={tk}/></Field>
+      </div>
+      <Field label="Password" tk={tk}><TInput type="password" value={pass} onChange={setPass} placeholder="Min 8 characters" required tk={tk}/></Field>
+      <TBtn label="Register Organisation" loading={loading} tk={tk}/>
+      <p style={{ textAlign:"center", fontSize:11, color:tk.ink3, margin:0, fontFamily:"'Libre Baskerville',serif" }}>Free 30-day trial · No card required</p>
+    </form>
+  );
+}
+
+function MemberForm({ tk, onDone }: { tk:typeof LIGHT; onDone:()=>void }) {
+  const [email,setEmail]=useState(""); const [pass,setPass]=useState("");
+  const [loading,setLoading]=useState(false);
+  const submit=(e:React.FormEvent)=>{ e.preventDefault(); setLoading(true); setTimeout(()=>{setLoading(false);onDone();},1400); };
+  return (
+    <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ padding:"12px 14px", borderRadius:10, border:`1.5px solid ${tk.goldBdr}`, background:tk.goldBg, fontSize:12, color:tk.ink2, lineHeight:1.6, fontFamily:"'Libre Baskerville',serif" }}>
+        Sign in with your <span style={{ fontFamily:"monospace", color:tk.gold }}>@organisation.com</span> email and you'll auto-join your org's space.
+      </div>
+      <Field label="Work Email" tk={tk}><TInput type="email" value={email} onChange={setEmail} placeholder="you@company.com" required tk={tk}/></Field>
+      <Field label="Password" tk={tk}><TInput type="password" value={pass} onChange={setPass} placeholder="Your password" required tk={tk}/></Field>
+      <TBtn label="Sign In" loading={loading} tk={tk}/>
+    </form>
+  );
+}
+
+function AdminForm({ tk, onDone }: { tk:typeof LIGHT; onDone:()=>void }) {
+  const [orgId,setOrgId]=useState(""); const [email,setEmail]=useState("");
+  const [pass,setPass]=useState(""); const [mfa,setMfa]=useState("");
+  const [step,setStep]=useState(0); const [loading,setLoading]=useState(false);
+  const submit=(e:React.FormEvent)=>{ e.preventDefault(); if(step===0){setStep(1);return;} setLoading(true); setTimeout(()=>{setLoading(false);onDone();},1500); };
+  return (
+    <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ padding:"10px 14px", borderRadius:10, border:`1.5px solid ${tk.goldBdr}`, background:tk.goldBg, fontSize:11, color:tk.ink2, fontFamily:"'Libre Baskerville',serif", lineHeight:1.6 }}>
+        ⚠ Admin portal — separate from member login.
+      </div>
+      {step===0 ? (
+        <>
+          <Field label="Organisation ID" note="Your unique org slug" tk={tk}><TInput value={orgId} onChange={setOrgId} placeholder="techcorp-india" required mono tk={tk}/></Field>
+          <Field label="Admin Email" tk={tk}><TInput type="email" value={email} onChange={setEmail} placeholder="admin@org.com" required tk={tk}/></Field>
+          <Field label="Password" tk={tk}><TInput type="password" value={pass} onChange={setPass} placeholder="Admin password" required tk={tk}/></Field>
+        </>
+      ) : (
+        <div style={{ textAlign:"center", padding:"8px 0" }}>
+          <div style={{ fontSize:28, marginBottom:8 }}>🔑</div>
+          <div style={{ fontFamily:"'Spectral',Georgia,serif", fontSize:16, color:tk.ink, fontWeight:700, marginBottom:4 }}>Two-Factor Auth</div>
+          <div style={{ fontSize:12, color:tk.ink2, marginBottom:16, fontFamily:"'Libre Baskerville',serif" }}>Enter the 6-digit code from your authenticator</div>
+          <input value={mfa} onChange={e=>setMfa(e.target.value.replace(/\D/g,"").slice(0,6))}
+            placeholder="000000" maxLength={6} required
+            style={{ width:"100%", padding:"14px", borderRadius:10, border:`1.5px solid ${tk.border}`, background:tk.bgAlt, fontSize:24, textAlign:"center", fontFamily:"monospace", letterSpacing:"0.4em", color:tk.ink, outline:"none", boxSizing:"border-box" }}
+            onFocus={e=>{e.target.style.borderColor=tk.gold;}} onBlur={e=>{e.target.style.borderColor=tk.border;}}
+          />
+          <button type="button" onClick={()=>setStep(0)} style={{ background:"none", border:"none", cursor:"pointer", color:tk.ink3, fontSize:12, marginTop:10, fontFamily:"'Libre Baskerville',serif" }}>← Back</button>
+        </div>
+      )}
+      <TBtn label={step===0?"Continue →":"Verify & Sign In"} loading={loading} tk={tk}/>
+    </form>
   );
 }
 
 // ─── Features ─────────────────────────────────────────────────────────────────
-function Features() {
-  const list = [
-    { icon:"🔐", title:"Domain-gated Access",         desc:"Your space is exclusively accessible to verified org email holders. Fully automated." },
-    { icon:"📋", title:"Private Event Listings",       desc:"Create internal-only events visible only to org members — town halls, offsites, standups." },
-    { icon:"🌐", title:"Public Event Discovery",       desc:"Optionally publish events to Eventimist's global feed and attract outside attendees." },
-    { icon:"🤝", title:"Volunteer Marketplace",        desc:"Post volunteer roles from your org. Community members can apply; admin approves." },
-    { icon:"📊", title:"Admin Analytics Dashboard",    desc:"Track attendance, RSVP rates, member growth, and event performance." },
-    { icon:"🔔", title:"Smart Member Notifications",   desc:"Members auto-notified on new events. Priority alerts for RSVPs." },
+function Features({ tk, dark }: { tk: typeof LIGHT; dark:boolean }) {
+  const feats = [
+    { icon:"◉", n:"01", title:"Domain Verification",  desc:"Link your email domain. Anyone with @yourcompany.com auto-joins as a verified member instantly." },
+    { icon:"◎", n:"02", title:"Auto Member Join",      desc:"New hires sign up with their work email — they're in. No invite links, no approvals, no expired codes." },
+    { icon:"◈", n:"03", title:"Private Event Hub",     desc:"Events visible only to verified members. Internal conferences, offsites, and team events stay truly private." },
+    { icon:"◇", n:"04", title:"Org-Scoped Analytics",  desc:"Attendance, RSVP trends, volunteer activity — all in one consolidated org dashboard." },
+    { icon:"◆", n:"05", title:"Multi-Admin Roles",     desc:"Assign event managers, finance leads, view-only stakeholders. Granular roles, zero confusion." },
+    { icon:"◐", n:"06", title:"Volunteer Matching",    desc:"Members opt into volunteer pools. Organisers post needs. Auto-matched on skills and availability." },
   ];
   return (
-    <section className="py-24 px-6 bg-[#07101f]" id="features-grid">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <span className="text-teal-400 text-sm font-bold tracking-widest uppercase">Features</span>
-          <h2 className="mt-4 text-white text-5xl font-black" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-            Built for organisations<br /><span className="text-white/20">that mean business</span>
-          </h2>
+    <section id="features" style={{ padding:"96px 24px", background: dark ? tk.bgAlt : tk.bg }}>
+      <div style={{ maxWidth:1100, margin:"0 auto" }}>
+        <div style={{ marginBottom:56, borderBottom:`1.5px solid ${tk.border}`, paddingBottom:28, display:"flex", alignItems:"flex-end", justifyContent:"space-between" }}>
+          <div>
+            <div style={{ fontSize:9, fontWeight:900, letterSpacing:"0.3em", textTransform:"uppercase", color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif", marginBottom:8 }}>What you get</div>
+            <h2 style={{ margin:0, fontFamily:"'Spectral',Georgia,serif", fontSize:"clamp(36px,4.5vw,60px)", color:tk.ink, lineHeight:0.95, fontWeight:700 }}>
+              Built for<br/><em style={{ fontStyle:"italic", color:tk.gold }}>organisations.</em>
+            </h2>
+          </div>
+          <span style={{ fontFamily:"'Spectral',serif", fontSize:100, lineHeight:1, color:tk.border, fontWeight:700 }}>06</span>
         </div>
-        <div className="grid md:grid-cols-3 gap-5">
-          {list.map((f, i) => (
-            <div key={i} className="bg-white/2 border border-white/6 hover:border-teal-500/25 hover:bg-teal-500/3 rounded-3xl p-7 transition-all duration-300 hover:-translate-y-1 cursor-pointer group">
-              <div className="text-3xl mb-4">{f.icon}</div>
-              <h3 className="text-white font-bold text-base mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{f.title}</h3>
-              <p className="text-white/35 text-sm leading-relaxed">{f.desc}</p>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:1, background:tk.border }}>
+          {feats.map((f,i) => (
+            <div key={i} style={{ padding:"32px 28px", background:tk.bg, transition:"background .2s", cursor:"default" }}
+              onMouseOver={e=>(e.currentTarget.style.background=tk.surface)}
+              onMouseOut={e=>(e.currentTarget.style.background=tk.bg)}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 }}>
+                <span style={{ fontSize:20, color:tk.gold }}>{f.icon}</span>
+                <span style={{ fontFamily:"'Spectral',serif", fontSize:36, color:tk.border, fontWeight:700, lineHeight:1 }}>{f.n}</span>
+              </div>
+              <h3 style={{ margin:"0 0 10px", fontFamily:"'Spectral',Georgia,serif", fontSize:18, fontWeight:700, color:tk.ink, letterSpacing:"0.01em" }}>{f.title}</h3>
+              <p style={{ margin:0, fontSize:13, color:tk.ink2, lineHeight:1.75, fontFamily:"'Libre Baskerville',Georgia,serif" }}>{f.desc}</p>
             </div>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Domain checker ────────────────────────────────────────────────────────────
-function DomainStrip() {
-  const [domain, setDomain]   = useState("");
-  const [status, setStatus]   = useState<null|"ok"|"taken">(null);
-  const [checking, setChecking] = useState(false);
-
-  const check = () => {
-    if (!domain) return;
-    setChecking(true); setStatus(null);
-    setTimeout(() => { setChecking(false); setStatus(domain.includes("taken") ? "taken" : "ok"); }, 1100);
-  };
-
-  return (
-    <section className="py-14 px-6 bg-[#060d1f] border-y border-white/5" id="domains">
-      <div className="max-w-2xl mx-auto text-center">
-        <p className="text-white/25 text-xs font-bold tracking-widest uppercase mb-3">Domain Check</p>
-        <h3 className="text-white text-3xl font-black mb-6" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-          Is your domain available?
-        </h3>
-        <div className="flex gap-2 bg-white/4 border border-white/8 rounded-2xl p-1.5">
-          <span className="flex items-center pl-4 text-white/25 text-sm font-mono select-none">@</span>
-          <input
-            value={domain} onChange={e => setDomain(e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g,""))}
-            onKeyDown={e => e.key === "Enter" && check()}
-            placeholder="yourorganisation.com"
-            className="flex-1 bg-transparent text-white/75 placeholder:text-white/18 text-sm font-mono outline-none py-2.5 min-w-0"
-          />
-          <button onClick={check} disabled={!domain || checking}
-            className="flex-shrink-0 bg-gradient-to-r from-teal-400 to-cyan-500 text-[#060d1f] font-bold text-sm px-5 py-2.5 rounded-xl disabled:opacity-40 hover:scale-[1.02] hover:shadow-lg hover:shadow-teal-500/20 transition-all">
-            {checking ? "Checking…" : "Check"}
-          </button>
-        </div>
-        {status === "ok" && (
-          <div className="mt-3 flex items-center justify-center gap-2 text-green-400 text-sm font-semibold">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-            <span className="font-mono text-white/50">@{domain}</span> is available —
-            <a href="#auth" className="text-teal-400 hover:underline ml-1">Register now →</a>
-          </div>
-        )}
-        {status === "taken" && (
-          <div className="mt-3 flex items-center justify-center gap-2 text-rose-400 text-sm font-semibold">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-            Already registered —
-            <a href="#auth" className="text-teal-400 ml-1 hover:underline">Sign in instead →</a>
-          </div>
-        )}
       </div>
     </section>
   );
 }
 
 // ─── Pricing ──────────────────────────────────────────────────────────────────
-function Pricing() {
+function Pricing({ tk }: { tk: typeof LIGHT }) {
+  const [annual, setAnnual] = useState(true);
   const plans = [
-    { name:"Starter", price:"Free", sub:"Forever", highlight:false, features:["1 domain","50 members","5 events/mo","Public listing","Basic analytics"] },
-    { name:"Growth",  price:"₹999", sub:"/month",  highlight:true,  features:["1 domain","500 members","Unlimited events","Private + public","Advanced analytics","Volunteer matching","Priority support"] },
-    { name:"Enterprise", price:"Custom", sub:"Contact us", highlight:false, features:["Multiple domains","Unlimited members","Unlimited events","Custom URL","API access","Custom branding","Dedicated SLA"] },
+    { name:"Free",       price:0,    aprice:0,    cap:"Up to 5 events/mo",    features:["1 admin","100 members","Basic analytics","Public events"],                                                       cta:"Start Free",  highlight:false },
+    { name:"Pro",        price:2999, aprice:1999, cap:"Unlimited events",      features:["5 admins","Unlimited members","Advanced analytics","Private events","Domain verify","Priority support"],         cta:"Start Pro",   highlight:true  },
+    { name:"Enterprise", price:null, aprice:null, cap:"Custom everything",     features:["Unlimited admins","Dedicated infra","SLA guarantee","SSO / SAML","Custom domain","White-label option"],          cta:"Contact Us",  highlight:false },
   ];
   return (
-    <section className="py-24 px-6 bg-[#060d1f]" id="pricing">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <span className="text-teal-400 text-sm font-bold tracking-widest uppercase">Pricing</span>
-          <h2 className="mt-4 text-white text-5xl font-black" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-            Simple, transparent<br /><span className="text-white/20">for every org</span>
-          </h2>
+    <section id="pricing" style={{ padding:"96px 24px", background:tk.bgAlt, borderTop:`1.5px solid ${tk.border}` }}>
+      <div style={{ maxWidth:900, margin:"0 auto" }}>
+        <div style={{ textAlign:"center", marginBottom:48 }}>
+          <div style={{ fontSize:9, fontWeight:900, letterSpacing:"0.3em", textTransform:"uppercase", color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif", marginBottom:10 }}>Simple pricing</div>
+          <h2 style={{ margin:"0 0 24px", fontFamily:"'Spectral',Georgia,serif", fontSize:"clamp(32px,4vw,56px)", color:tk.ink, fontWeight:700 }}>No surprises.</h2>
+          {/* Toggle */}
+          <div style={{ display:"inline-flex", border:`1.5px solid ${tk.border}`, borderRadius:10, overflow:"hidden", background:tk.bg }}>
+            {["Monthly","Annual"].map(l => (
+              <button key={l} onClick={()=>setAnnual(l==="Annual")}
+                style={{ padding:"8px 20px", background:(l==="Annual")===annual?tk.gold:"transparent",
+                  color:(l==="Annual")===annual?"#fff":tk.ink2, border:"none", cursor:"pointer",
+                  fontFamily:"'Barlow Condensed',sans-serif", fontWeight:900, fontSize:11, letterSpacing:"0.12em", textTransform:"uppercase", transition:"all .2s" }}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {annual && <div style={{ fontSize:11, color:tk.gold, marginTop:8, fontFamily:"'Libre Baskerville',serif" }}>Save up to 33% annually</div>}
         </div>
-        <div className="grid md:grid-cols-3 gap-6 items-start">
-          {plans.map((p, i) => (
-            <div key={i} className={`relative rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 ${p.highlight ? "bg-gradient-to-b from-teal-500/10 to-transparent border-teal-500/40 shadow-2xl shadow-teal-500/8" : "bg-white/2 border-white/7 hover:bg-white/4"}`}>
+
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:1, background:tk.border }}>
+          {plans.map((p,i) => (
+            <div key={i} style={{ padding:"32px 24px", background: p.highlight ? tk.surface : tk.bg, position:"relative" }}>
               {p.highlight && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-teal-400 to-cyan-500 text-[#060d1f] text-xs font-black px-4 py-1 rounded-full">Most Popular</div>
+                <div style={{ position:"absolute", top:0, left:"50%", transform:"translate(-50%,-50%)", background:tk.gold, color:"#fff", fontSize:9, fontWeight:900, letterSpacing:"0.2em", textTransform:"uppercase", padding:"4px 12px", borderRadius:99, fontFamily:"'Barlow Condensed',sans-serif" }}>
+                  Most Popular
+                </div>
               )}
-              <div className="text-white/35 text-xs font-bold tracking-widest uppercase mb-3">{p.name}</div>
-              <div className="flex items-end gap-2 mb-7">
-                <span className="text-white text-4xl font-black" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{p.price}</span>
-                <span className="text-white/25 text-sm mb-1">{p.sub}</span>
+              <div style={{ fontSize:10, fontWeight:900, letterSpacing:"0.18em", textTransform:"uppercase", color:p.highlight?tk.gold:tk.ink3, fontFamily:"'Barlow Condensed',sans-serif", marginBottom:12 }}>{p.name}</div>
+              <div style={{ marginBottom:6 }}>
+                {p.price===null
+                  ? <span style={{ fontFamily:"'Spectral',serif", fontSize:30, fontWeight:700, color:tk.ink }}>Custom</span>
+                  : p.price===0
+                    ? <span style={{ fontFamily:"'Spectral',serif", fontSize:36, fontWeight:700, color:tk.ink }}>₹0</span>
+                    : <span><span style={{ fontFamily:"'Spectral',serif", fontSize:36, fontWeight:700, color:tk.ink }}>₹{(annual?p.aprice:p.price)?.toLocaleString()}</span><span style={{ fontSize:12, color:tk.ink3 }}>/mo</span></span>
+                }
               </div>
-              <div className="space-y-3 mb-8">
-                {p.features.map((f,j) => (
-                  <div key={j} className="flex items-center gap-2.5 text-sm">
-                    <svg className={`w-4 h-4 flex-shrink-0 ${p.highlight ? "text-teal-400" : "text-white/25"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    <span className="text-white/55">{f}</span>
+              <div style={{ fontSize:11, color:tk.ink3, marginBottom:24, fontFamily:"'Libre Baskerville',serif" }}>{p.cap}</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:28 }}>
+                {p.features.map(f => (
+                  <div key={f} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <span style={{ color:tk.gold, fontSize:10 }}>◉</span>
+                    <span style={{ fontSize:12, color:tk.ink2, fontFamily:"'Libre Baskerville',serif" }}>{f}</span>
                   </div>
                 ))}
               </div>
-              <a href="#auth" className={`block text-center font-bold py-3.5 rounded-2xl text-sm transition-all hover:scale-[1.01] ${p.highlight ? "bg-gradient-to-r from-teal-400 to-cyan-500 text-[#060d1f] hover:shadow-xl hover:shadow-teal-400/25" : "border border-white/10 text-white/60 hover:bg-white/5 hover:text-white"}`}>
-                {p.price === "Custom" ? "Contact Sales" : p.price === "Free" ? "Get Started Free" : "Start Growth Plan"}
-              </a>
+              <button style={{
+                width:"100%", padding:"11px 16px", borderRadius:10,
+                background: p.highlight ? tk.gold : "transparent",
+                color: p.highlight ? "#fff" : tk.ink2,
+                border: `1.5px solid ${p.highlight ? tk.gold : tk.border}`,
+                cursor:"pointer", fontFamily:"'Barlow Condensed',sans-serif",
+                fontWeight:900, fontSize:11, letterSpacing:"0.12em", textTransform:"uppercase",
+                transition:"all .2s",
+              }}
+              onMouseOver={e=>{(e.currentTarget as HTMLButtonElement).style.borderColor=tk.gold;(e.currentTarget as HTMLButtonElement).style.color=tk.gold;}}
+              onMouseOut={e=>{if(!p.highlight){(e.currentTarget as HTMLButtonElement).style.borderColor=tk.border;(e.currentTarget as HTMLButtonElement).style.color=tk.ink2;}}}>
+                {p.cta}
+              </button>
             </div>
           ))}
         </div>
@@ -474,490 +456,67 @@ function Pricing() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── AUTH SECTION: 3 tabs ─────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
-
-type AuthTab = "member" | "admin" | "register";
-
-const AUTH_TABS: { id: AuthTab; label: string; icon: React.ReactNode; desc: string }[] = [
-  {
-    id: "member",
-    label: "Member Login",
-    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-    desc: "Sign in with your organisation email",
-  },
-  {
-    id: "admin",
-    label: "Admin Login",
-    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>,
-    desc: "Manage events & your Eventix Space",
-  },
-  {
-    id: "register",
-    label: "Register Org",
-    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-    desc: "Create your organisation's space",
-  },
-];
-
-// ── Member Login ──────────────────────────────────────────────────────────────
-function MemberLoginForm({ onDone }: { onDone: () => void }) {
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(false);
-  const [loading, setLoading]   = useState(false);
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setTimeout(() => { setLoading(false); onDone(); }, 1600);
-  };
-
+// ─── Domain Section ───────────────────────────────────────────────────────────
+function DomainSection({ tk }: { tk: typeof LIGHT }) {
+  const steps = [
+    { n:"01", title:"Register your org",   body:"Enter your organisation details and admin email. Takes 2 minutes." },
+    { n:"02", title:"Verify your domain",  body:"Add a DNS TXT record or upload a verification file to prove domain ownership." },
+    { n:"03", title:"Members auto-join",   body:"Anyone who signs up or logs in with your domain email is instantly a verified member." },
+    { n:"04", title:"Host private events", body:"Create events visible only to your members. No external access, no leakage." },
+  ];
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <div className="bg-teal-500/6 border border-teal-500/15 rounded-2xl px-4 py-3 flex items-start gap-3">
-        <svg className="w-4 h-4 text-teal-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <p className="text-teal-300/80 text-xs leading-relaxed">
-          Use your <strong>organisation email</strong> (e.g. <span className="font-mono">name@yourorg.com</span>). Personal emails won't work.
-        </p>
-      </div>
-
-      <div>
-        <Label>Organisation Email</Label>
-        <DarkInput
-          type="email" value={email} onChange={setEmail}
-          placeholder="you@yourorg.com" required
-          icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>}
-        />
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <Label>Password</Label>
-          <a href="#" className="text-[10px] text-teal-400 hover:text-teal-300 font-semibold">Forgot password?</a>
-        </div>
-        <DarkInput
-          type="password" value={password} onChange={setPassword}
-          placeholder="Your password" required
-          icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
-        />
-      </div>
-
-      <label className="flex items-center gap-2.5 cursor-pointer select-none">
-        <button type="button" onClick={() => setRemember(v => !v)}
-          className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center flex-shrink-0 ${remember ? "bg-teal-400 border-teal-400" : "border-white/20 hover:border-teal-400/50"}`}>
-          {remember && <svg className="w-2.5 h-2.5 text-[#060d1f]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
-        </button>
-        <span className="text-white/30 text-xs">Keep me signed in</span>
-      </label>
-
-      <SubmitBtn loading={loading} label="Sign In as Member" />
-      <p className="text-center text-white/20 text-xs">
-        Not a member yet?{" "}
-        <span className="text-white/40">Ask your org admin to invite you, or</span>{" "}
-        <a href="/" className="text-teal-400 hover:text-teal-300 font-semibold">use your org email to auto-join →</a>
-      </p>
-    </form>
-  );
-}
-
-// ── Admin Login ───────────────────────────────────────────────────────────────
-function AdminLoginForm({ onDone }: { onDone: () => void }) {
-  const [email, setEmail]     = useState("");
-  const [orgId, setOrgId]     = useState("");
-  const [password, setPass]   = useState("");
-  const [mfa, setMfa]         = useState("");
-  const [showMfa, setShowMfa] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!showMfa) { setShowMfa(true); return; }
-    setLoading(true);
-    setTimeout(() => { setLoading(false); onDone(); }, 1600);
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-4">
-      {/* Admin badge */}
-      <div className="bg-amber-500/6 border border-amber-500/15 rounded-2xl px-4 py-3 flex items-start gap-3">
-        <svg className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-          <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-        </svg>
-        <p className="text-amber-300/80 text-xs leading-relaxed">
-          Admin access is <strong>separate</strong> from member login. Use your admin credentials set during org registration.
-        </p>
-      </div>
-
-      {!showMfa ? (
-        <>
-          <div>
-            <Label>Organisation ID / Slug</Label>
-            <DarkInput
-              value={orgId} onChange={setOrgId} placeholder="techcorp-india" required mono
-              icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>}
-            />
-            <p className="text-white/20 text-[10px] mt-1">Your unique org identifier (set during registration)</p>
-          </div>
-
-          <div>
-            <Label>Admin Email</Label>
-            <DarkInput
-              type="email" value={email} onChange={setEmail} placeholder="admin@yourorg.com" required
-              icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>}
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <Label>Admin Password</Label>
-              <a href="#" className="text-[10px] text-teal-400 hover:text-teal-300 font-semibold">Forgot?</a>
+    <section id="domains" style={{ padding:"96px 24px", background:tk.bg, borderTop:`1.5px solid ${tk.border}` }}>
+      <div style={{ maxWidth:1100, margin:"0 auto", display:"grid", gridTemplateColumns:"1fr 460px", gap:64, alignItems:"start" }}>
+        <div>
+          <div style={{ fontSize:9, fontWeight:900, letterSpacing:"0.3em", textTransform:"uppercase", color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif", marginBottom:10 }}>Domain verification</div>
+          <h2 style={{ margin:"0 0 48px", fontFamily:"'Spectral',Georgia,serif", fontSize:"clamp(30px,4vw,54px)", color:tk.ink, fontWeight:700, lineHeight:1.05 }}>
+            Four steps<br/>to secured<br/><em style={{ color:tk.gold }}>access.</em>
+          </h2>
+          {steps.map((s,i) => (
+            <div key={i} style={{ display:"flex", gap:20, padding:"18px 0", borderTop:`1.5px solid ${tk.border}` }}
+              className="step-row">
+              <span style={{ fontSize:11, fontWeight:900, letterSpacing:"0.15em", color:tk.ink3, fontFamily:"'Barlow Condensed',sans-serif", flexShrink:0, marginTop:2 }}>{s.n}</span>
+              <div>
+                <div style={{ fontFamily:"'Spectral',Georgia,serif", fontSize:16, fontWeight:700, color:tk.ink, marginBottom:4 }}>{s.title}</div>
+                <div style={{ fontSize:13, color:tk.ink2, lineHeight:1.7, fontFamily:"'Libre Baskerville',serif" }}>{s.body}</div>
+              </div>
             </div>
-            <DarkInput
-              type="password" value={password} onChange={setPass} placeholder="Your admin password" required
-              icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
-            />
-          </div>
-        </>
-      ) : (
-        /* MFA step */
-        <div className="mfa-in">
-          <div className="text-center mb-5">
-            <div className="w-14 h-14 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-2xl mx-auto mb-3">🔑</div>
-            <div className="text-white font-bold text-sm">Two-factor Authentication</div>
-            <div className="text-white/30 text-xs mt-1">Enter the 6-digit code from your authenticator app</div>
-          </div>
-          <div>
-            <Label>Verification Code</Label>
-            <input
-              value={mfa} onChange={e => setMfa(e.target.value.replace(/\D/g,"").slice(0,6))}
-              placeholder="000 000" maxLength={6} required
-              className="w-full px-4 py-4 bg-white/5 border border-white/10 hover:border-white/20 focus:border-teal-500/50 focus:ring-4 focus:ring-teal-500/10 rounded-xl text-xl text-white/80 placeholder:text-white/15 outline-none transition-all text-center font-mono tracking-[0.5em]"
-            />
-          </div>
-          <button type="button" onClick={() => setShowMfa(false)} className="text-white/30 hover:text-white/60 text-xs transition-colors mt-2 block mx-auto">
-            ← Back to credentials
-          </button>
+          ))}
         </div>
-      )}
 
-      <SubmitBtn loading={loading} label={showMfa ? "Verify & Sign In" : "Continue →"} accent="amber" />
-    </form>
-  );
-}
-
-// ── Register Org ───────────────────────────────────────────────────────────────
-function RegisterOrgForm({ onDone }: { onDone: () => void }) {
-  const [orgName, setOrgName]       = useState("");
-  const [slug, setSlug]             = useState("");
-  const [domain, setDomain]         = useState("");
-  const [category, setCategory]     = useState("");
-  const [adminName, setAdminName]   = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [password, setPassword]     = useState("");
-  const [size, setSize]             = useState("");
-  const [agreed, setAgreed]         = useState(false);
-  const [loading, setLoading]       = useState(false);
-
-  // Auto-generate slug from org name
-  const handleOrgName = (v: string) => {
-    setOrgName(v);
-    setSlug(v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
-  };
-
-  const CATEGORIES = ["NGO / Non-profit","Corporate","Educational Institution","Government Body","Healthcare","Sports & Recreation","Arts & Culture","Other"];
-  const SIZES      = ["1–10","11–50","51–200","201–500","500+"];
-
-  const passStrength = password.length === 0 ? 0 : password.length < 4 ? 1 : password.length < 7 ? 2 : password.length < 10 ? 3 : 4;
-  const strMeta = [
-    {l:"",c:""},
-    {l:"Weak",  c:"bg-rose-400"},
-    {l:"Fair",  c:"bg-amber-400"},
-    {l:"Good",  c:"bg-yellow-400"},
-    {l:"Strong",c:"bg-teal-400"},
-  ][passStrength];
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setTimeout(() => { setLoading(false); onDone(); }, 1900);
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-4">
-      {/* Org Name + Slug */}
-      <div className="grid grid-cols-2 gap-3">
+        {/* Terminal card */}
         <div>
-          <Label>Organisation Name</Label>
-          <DarkInput value={orgName} onChange={handleOrgName} placeholder="TechCorp India" required />
-        </div>
-        <div>
-          <Label>Space Slug</Label>
-          <DarkInput
-            value={slug} onChange={setSlug} placeholder="techcorp-india" required mono
-            icon={<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>}
-          />
-          {slug && <p className="text-white/18 text-[9px] mt-1 font-mono">eventimist.com/eventix/<span className="text-teal-400/70">{slug}</span></p>}
-        </div>
-      </div>
-
-      {/* Domain */}
-      <div>
-        <Label>Official Email Domain</Label>
-        <DarkInput value={domain} onChange={v => setDomain(v.toLowerCase())} placeholder="yourorg.com" required mono prefix="@" />
-        <p className="text-white/18 text-[9px] mt-1">Only <span className="text-teal-400/60 font-mono">@{domain || "yourorg.com"}</span> emails will get auto-access</p>
-      </div>
-
-      {/* Category + Size */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label>Category</Label>
-          <select value={category} onChange={e => setCategory(e.target.value)} required
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 hover:border-white/20 focus:border-teal-500/50 focus:ring-4 focus:ring-teal-500/10 rounded-xl text-sm text-white/55 outline-none transition-all appearance-none"
-            style={{ background: "rgba(255,255,255,0.05)" }}>
-            <option value="" className="bg-[#0b1630]">Select…</option>
-            {CATEGORIES.map(c => <option key={c} value={c} className="bg-[#0b1630]">{c}</option>)}
-          </select>
-        </div>
-        <div>
-          <Label>Org Size</Label>
-          <select value={size} onChange={e => setSize(e.target.value)} required
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 hover:border-white/20 focus:border-teal-500/50 focus:ring-4 focus:ring-teal-500/10 rounded-xl text-sm text-white/55 outline-none transition-all appearance-none"
-            style={{ background: "rgba(255,255,255,0.05)" }}>
-            <option value="" className="bg-[#0b1630]">Members…</option>
-            {SIZES.map(s => <option key={s} value={s} className="bg-[#0b1630]">{s}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* Admin name + email */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label>Admin Name</Label>
-          <DarkInput value={adminName} onChange={setAdminName} placeholder="Rahul Verma" required />
-        </div>
-        <div>
-          <Label>Admin Email</Label>
-          <DarkInput type="email" value={adminEmail} onChange={setAdminEmail} placeholder={`admin@${domain||"yourorg.com"}`} required
-            icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>}
-          />
-        </div>
-      </div>
-
-      {/* Password */}
-      <div>
-        <Label>Admin Password</Label>
-        <DarkInput type="password" value={password} onChange={setPassword} placeholder="Min. 8 characters" required
-          icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
-        />
-        {password.length > 0 && (
-          <div className="flex items-center gap-1.5 mt-1.5">
-            {[1,2,3,4].map(i => (
-              <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= passStrength ? strMeta.c : "bg-white/8"}`} />
-            ))}
-            <span className="text-[9px] font-bold ml-1 text-white/30">{strMeta.l}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Terms */}
-      <label className="flex items-start gap-2.5 cursor-pointer select-none">
-        <button type="button" onClick={() => setAgreed(v => !v)}
-          className={`w-4 h-4 mt-0.5 rounded border-2 transition-all flex items-center justify-center flex-shrink-0 ${agreed ? "bg-teal-400 border-teal-400" : "border-white/20 hover:border-teal-400/40"}`}>
-          {agreed && <svg className="w-2.5 h-2.5 text-[#060d1f]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
-        </button>
-        <span className="text-white/25 text-xs leading-relaxed">
-          I confirm this domain belongs to our organisation and agree to the{" "}
-          <a href="#" className="text-teal-400 hover:underline">Terms of Service</a>
-        </span>
-      </label>
-
-      <SubmitBtn loading={loading} label="Submit for Verification" disabled={!agreed} />
-      <p className="text-center text-white/20 text-xs">Verification takes up to 24 hours. We'll email your admin once approved.</p>
-    </form>
-  );
-}
-
-// ── Shared submit button ──────────────────────────────────────────────────────
-function SubmitBtn({ loading, label, accent = "teal", disabled }: {
-  loading: boolean; label: string; accent?: "teal" | "amber"; disabled?: boolean;
-}) {
-  const grad = accent === "amber"
-    ? "from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 shadow-amber-400/25"
-    : "from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 shadow-teal-400/25";
-  return (
-    <button type="submit" disabled={loading || disabled}
-      className={`w-full bg-gradient-to-r ${grad} disabled:opacity-40 text-[#060d1f] font-black py-4 rounded-2xl transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] text-sm flex items-center justify-center gap-2`}>
-      {loading
-        ? <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Processing…</>
-        : <>{label}<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></>
-      }
-    </button>
-  );
-}
-
-// ── Success screens ────────────────────────────────────────────────────────────
-const SUCCESS_COPY: Record<AuthTab, { title: string; body: string; cta: string }> = {
-  member:   { title:"Welcome to your Space 👋",      body:"You're signed in. Your organisation's events are loading.",                            cta:"Go to My Events" },
-  admin:    { title:"Admin Dashboard Ready 🛡️",       body:"You're signed in as admin. Manage your Eventix Space, events, and members.",          cta:"Open Admin Dashboard" },
-  register: { title:"Application Submitted! 🎉",     body:"We'll verify your domain within 24 hours and send an activation email to your admin.",  cta:"Back to Home" },
-};
-
-function SuccessScreen({ tab, onReset }: { tab: AuthTab; onReset: () => void }) {
-  const c = SUCCESS_COPY[tab];
-  const accent = tab === "admin" ? "from-amber-400 to-orange-500 shadow-amber-300/30" : "from-teal-400 to-cyan-500 shadow-teal-300/30";
-  return (
-    <div className="flex flex-col items-center text-center py-6 success-in">
-      <div className="relative w-20 h-20 mb-5">
-        <div className="absolute inset-0 rounded-full bg-teal-400/15 animate-ping opacity-40" />
-        <div className={`relative w-20 h-20 rounded-full bg-gradient-to-br ${accent} flex items-center justify-center shadow-xl`}>
-          <svg className="w-9 h-9 text-[#060d1f]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
-        </div>
-      </div>
-      <h3 className="text-white text-2xl font-black mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{c.title}</h3>
-      <p className="text-white/40 text-sm max-w-xs leading-relaxed">{c.body}</p>
-      <button onClick={onReset}
-        className={`mt-7 bg-gradient-to-r ${accent} text-[#060d1f] font-black px-8 py-3.5 rounded-2xl text-sm hover:shadow-xl hover:scale-[1.02] transition-all`}>
-        {c.cta} →
-      </button>
-    </div>
-  );
-}
-
-// ── Main auth section ──────────────────────────────────────────────────────────
-function AuthSection() {
-  const [tab, setTab]   = useState<AuthTab>("member");
-  const [done, setDone] = useState(false);
-
-  const handleDone = () => setDone(true);
-
-  return (
-    <section id="auth" className="py-24 px-6 bg-[#07101f] scroll-mt-20">
-      <div className="max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-2 gap-16 items-start">
-
-          {/* Left: context copy */}
-          <div className="lg:sticky lg:top-28">
-            <span className="text-teal-400 text-sm font-bold tracking-widest uppercase">Access Your Space</span>
-            <h2 className="mt-4 text-white text-5xl font-black leading-tight mb-6" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-              Three ways<br />to enter<br />
-              <span className="bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">Eventix Space</span>
-            </h2>
-            <p className="text-white/40 leading-relaxed mb-8">
-              Members, admins, and new organisations each have a distinct path — keeping access clean, secure, and role-appropriate.
-            </p>
-
-            {/* Role cards */}
-            <div className="space-y-3">
-              {AUTH_TABS.map(t => (
-                <button key={t.id} onClick={() => { setTab(t.id); setDone(false); }}
-                  className={`w-full flex items-center gap-4 rounded-2xl px-5 py-4 border transition-all duration-200 text-left ${
-                    tab === t.id
-                      ? "bg-teal-500/10 border-teal-500/35 shadow-lg shadow-teal-500/5"
-                      : "bg-white/2 border-white/6 hover:bg-white/4 hover:border-white/12"
-                  }`}>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
-                    tab === t.id ? "bg-teal-400/20 text-teal-400" : "bg-white/5 text-white/30"
-                  }`}>
-                    {t.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className={`font-bold text-sm transition-colors ${tab === t.id ? "text-white" : "text-white/50"}`}>{t.label}</div>
-                    <div className="text-white/25 text-xs mt-0.5">{t.desc}</div>
-                  </div>
-                  {tab === t.id && (
-                    <svg className="w-4 h-4 text-teal-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
-                    </svg>
-                  )}
-                </button>
-              ))}
+          <div style={{ borderRadius:14, border:`1.5px solid ${tk.border}`, overflow:"hidden", background:tk.surface, boxShadow:`0 8px 32px ${tk.shadow}` }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 16px", borderBottom:`1.5px solid ${tk.border}`, background:tk.bgAlt }}>
+              {["#ef4444","#f59e0b","#22c55e"].map((c,i)=>(<div key={i} style={{ width:10, height:10, borderRadius:"50%", background:c, opacity:.7 }}/>))}
+              <span style={{ marginLeft:6, fontSize:10, color:tk.ink3, fontFamily:"monospace" }}>DNS TXT Record</span>
             </div>
-
-            {/* Small note */}
-            <div className="mt-6 flex items-start gap-3 bg-white/3 border border-white/6 rounded-2xl px-4 py-3">
-              <svg className="w-4 h-4 text-white/25 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              <p className="text-white/25 text-xs leading-relaxed">
-                Admin credentials are set during registration and are <strong className="text-white/40">separate</strong> from member login — even if both use the same email domain.
-              </p>
+            <div style={{ padding:20, fontFamily:"monospace", fontSize:12, lineHeight:2 }}>
+              <div style={{ color:tk.ink3 }}>Type<span style={{ marginLeft:32, color:tk.gold }}>TXT</span></div>
+              <div style={{ color:tk.ink3 }}>Host<span style={{ marginLeft:32, color:tk.ink2 }}>@</span></div>
+              <div style={{ color:tk.ink3 }}>Value<span style={{ marginLeft:20, color:"#16a34a", wordBreak:"break-all" }}>eventix-verify=a3f8b2c1...</span></div>
+              <div style={{ color:tk.ink3 }}>TTL<span style={{ marginLeft:36, color:tk.ink2 }}>3600</span></div>
+            </div>
+            <div style={{ borderTop:`1.5px solid ${tk.border}`, padding:"12px 20px", display:"flex", alignItems:"center", gap:8 }}>
+              <div style={{ width:8, height:8, borderRadius:"50%", background:"#16a34a" }} className="pulse-green"/>
+              <span style={{ fontSize:11, fontWeight:700, letterSpacing:"0.15em", textTransform:"uppercase", color:"#16a34a", fontFamily:"'Barlow Condensed',sans-serif" }}>Domain Verified</span>
             </div>
           </div>
 
-          {/* Right: form panel */}
-          <div>
-            {/* Form card */}
-            <div className="bg-white/3 border border-white/8 rounded-3xl overflow-hidden">
-              {/* Card header */}
-              <div className={`px-7 pt-7 pb-5 border-b border-white/6 ${
-                tab === "admin" ? "bg-amber-500/4" : tab === "register" ? "bg-teal-500/4" : ""
-              }`}>
-                <div className="flex items-center gap-3 mb-1">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                    tab === "member"   ? "bg-teal-400/15 text-teal-400"  :
-                    tab === "admin"    ? "bg-amber-400/15 text-amber-400" :
-                                        "bg-teal-400/15 text-teal-400"
-                  }`}>
-                    {AUTH_TABS.find(t => t.id === tab)?.icon}
+          {/* Live joins */}
+          <div style={{ marginTop:16, borderRadius:14, border:`1.5px solid ${tk.border}`, background:tk.surface, padding:20, boxShadow:`0 4px 16px ${tk.shadow}` }}>
+            <div style={{ fontSize:9, fontWeight:900, letterSpacing:"0.2em", textTransform:"uppercase", color:tk.ink3, fontFamily:"'Barlow Condensed',sans-serif", marginBottom:14 }}>Live member joins</div>
+            {[{e:"priya.k@techcorp.com",t:"2s ago"},{e:"rajan.m@techcorp.com",t:"1m ago"},{e:"sneha.v@techcorp.com",t:"3m ago"}].map((m,i)=>(
+              <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom: i<2 ? `1px solid ${tk.border}` : "none" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{ width:28, height:28, borderRadius:8, background:tk.goldBg, border:`1px solid ${tk.goldBdr}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <span style={{ fontSize:11, fontWeight:900, color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif" }}>{m.e[0].toUpperCase()}</span>
                   </div>
-                  <div>
-                    <div className="text-white font-bold text-base">{AUTH_TABS.find(t => t.id === tab)?.label}</div>
-                    <div className="text-white/30 text-xs">{AUTH_TABS.find(t => t.id === tab)?.desc}</div>
-                  </div>
+                  <span style={{ fontSize:12, fontFamily:"monospace", color:tk.ink2 }}>{m.e}</span>
                 </div>
+                <span style={{ fontSize:10, color:tk.ink3 }}>{m.t}</span>
               </div>
-
-              {/* Form body */}
-              <div className="px-7 py-6">
-                {done ? (
-                  <SuccessScreen tab={tab} onReset={() => setDone(false)} />
-                ) : (
-                  <>
-                    {tab === "member"   && <MemberLoginForm   onDone={handleDone} />}
-                    {tab === "admin"    && <AdminLoginForm     onDone={handleDone} />}
-                    {tab === "register" && <RegisterOrgForm   onDone={handleDone} />}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Final CTA ────────────────────────────────────────────────────────────────
-function FinalCTA() {
-  return (
-    <section className="py-24 px-6 bg-[#060d1f]">
-      <div className="max-w-4xl mx-auto">
-        <div className="relative bg-gradient-to-br from-teal-900/35 via-[#0b1f35] to-[#060d1f] border border-teal-500/18 rounded-[2.5rem] p-14 overflow-hidden text-center">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-40 bg-teal-400/8 blur-3xl pointer-events-none" />
-          <div className="relative z-10">
-            <div className="text-5xl mb-5">🏛️</div>
-            <h2 className="text-white text-5xl font-black leading-tight mb-4" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-              Claim your organisation's<br />
-              <span className="bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">Eventix Space</span>
-            </h2>
-            <p className="text-white/35 text-lg mb-10 max-w-xl mx-auto">
-              Join 2,000+ organisations hosting events, engaging members, and placing volunteers — all in one verified space.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="#auth" className="group flex items-center justify-center gap-2 bg-gradient-to-r from-teal-400 to-cyan-500 text-[#060d1f] font-black px-10 py-4 rounded-2xl hover:shadow-2xl hover:shadow-teal-400/25 hover:scale-[1.02] transition-all text-base">
-                Register Your Organisation
-                <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-              </a>
-              <a href="/" className="flex items-center justify-center border border-white/10 hover:border-white/22 text-white/50 hover:text-white font-semibold px-10 py-4 rounded-2xl transition-all hover:bg-white/4 text-base">
-                ← Back to Eventimist
-              </a>
-            </div>
+            ))}
           </div>
         </div>
       </div>
@@ -966,26 +525,30 @@ function FinalCTA() {
 }
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
-function Footer() {
+function Footer({ tk }: { tk: typeof LIGHT }) {
   return (
-    <footer className="border-t border-white/5 py-12 px-6 bg-[#060d1f]">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white">
-              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
+    <footer style={{ borderTop:`1.5px solid ${tk.border}`, padding:"32px 24px", background:tk.bgAlt }}>
+      <div style={{ maxWidth:1100, margin:"0 auto", display:"flex", flexWrap:"wrap", alignItems:"center", justifyContent:"space-between", gap:16 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ position:"relative", width:28, height:28 }}>
+            <div style={{ position:"absolute", inset:0, background:tk.gold, borderRadius:6, transform:"rotate(6deg)" }}/>
+            <div style={{ position:"absolute", inset:0, background:tk.surface, border:`1.5px solid ${tk.border}`, borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <span style={{ color:tk.gold, fontWeight:900, fontSize:10, fontFamily:"'Barlow Condensed',sans-serif" }}>EX</span>
+            </div>
           </div>
-          <span className="text-white font-black text-base" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>eventix</span>
-          <span className="text-teal-400 font-black text-base">space</span>
-          <span className="text-white/18 text-xs ml-1">by eventimist</span>
+          <span style={{ fontFamily:"'Spectral',Georgia,serif", fontWeight:700, fontSize:16, color:tk.ink }}>Eventix Space</span>
+          <span style={{ fontSize:10, color:tk.ink3 }}>by Eventimist</span>
         </div>
-        <div className="flex gap-8 text-sm text-white/20">
-          {["Privacy","Terms","Docs","Support"].map(l => (
-            <a key={l} href="#" className="hover:text-white/50 transition-colors">{l}</a>
+        <div style={{ display:"flex", gap:24 }}>
+          {["Privacy","Terms","Contact","Status"].map(l => (
+            <a key={l} href="#" style={{ fontSize:10, fontWeight:800, letterSpacing:"0.15em", textTransform:"uppercase", color:tk.ink3, textDecoration:"none", fontFamily:"'Barlow Condensed',sans-serif" }}
+              onMouseOver={e=>((e.target as HTMLElement).style.color=tk.gold)}
+              onMouseOut={e=>((e.target as HTMLElement).style.color=tk.ink3)}>
+              {l}
+            </a>
           ))}
         </div>
-        <div className="text-white/15 text-xs">© 2025 Eventimist · Eventix Space</div>
+        <span style={{ fontSize:10, color:tk.ink3, fontFamily:"'Libre Baskerville',serif" }}>© 2025 Eventimist</span>
       </div>
     </footer>
   );
@@ -993,51 +556,150 @@ function Footer() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function EventixPage() {
+  const [dark, setDark] = useState(false);
+  const tk = dark ? DARK : LIGHT;
+  const [vis, setVis] = useState(false);
+  useEffect(() => { setTimeout(()=>setVis(true),80); }, []);
+
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
-        * { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body { margin: 0; background: #060d1f; }
-
-        @keyframes marquee {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-33.333%); }
+        @import url('https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Libre+Baskerville:wght@400;700&family=Barlow+Condensed:wght@400;700;900&family=Caveat:wght@400;600&display=swap');
+        *,*::before,*::after{box-sizing:border-box}
+        html{scroll-behavior:smooth}
+        body{margin:0;-webkit-font-smoothing:antialiased}
+        input::placeholder{opacity:.45}
+        @keyframes pulse-g{0%,100%{opacity:1}50%{opacity:.4}}
+        .pulse-green{animation:pulse-g 2s ease-in-out infinite}
+        @keyframes marquee-ltr{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        .marquee-ltr{animation:marquee-ltr 28s linear infinite;width:max-content}
+        .marquee-ltr:hover{animation-play-state:paused}
+        @media(max-width:768px){
+          .domain-grid{grid-template-columns:1fr!important}
+          .plans-grid{grid-template-columns:1fr!important}
         }
-        .org-marquee { animation: marquee 28s linear infinite; }
-        .org-marquee:hover { animation-play-state: paused; }
-
-        @keyframes success-in {
-          from { opacity: 0; transform: scale(0.93); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-        .success-in { animation: success-in 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-
-        @keyframes mfa-in {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .mfa-in { animation: mfa-in 0.35s ease-out forwards; }
-
-        input:-webkit-autofill {
-          -webkit-box-shadow: 0 0 0 100px #0b1630 inset !important;
-          -webkit-text-fill-color: rgba(255,255,255,0.8) !important;
-        }
-        select option { background-color: #0b1630; color: rgba(255,255,255,0.7); }
       `}</style>
 
-      <div className="min-h-screen bg-[#060d1f] text-white">
-        <Nav />
-        <Hero />
-        <OrgMarquee />
-        <HowItWorks />
-        <Features />
-        <DomainStrip />
-        <Pricing />
-        <AuthSection />
-        <FinalCTA />
-        <Footer />
+      <div style={{ minHeight:"100vh", background:tk.bg, color:tk.ink, transition:"background .4s, color .4s" }}>
+
+        {/* ── Nav ── */}
+        <nav style={{ position:"sticky", top:0, zIndex:50, borderBottom:`1.5px solid ${tk.border}`, backdropFilter:"blur(16px)", background:tk.bg+"e8" }}>
+          <div style={{ maxWidth:1100, margin:"0 auto", padding:"14px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            {/* Logo */}
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ position:"relative", width:30, height:30, flexShrink:0 }}>
+                <div style={{ position:"absolute", inset:0, background:tk.gold, borderRadius:7, transform:"rotate(6deg)" }}/>
+                <div style={{ position:"absolute", inset:0, background:tk.surface, border:`1.5px solid ${tk.border}`, borderRadius:7, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <span style={{ color:tk.gold, fontWeight:900, fontSize:11, fontFamily:"'Barlow Condensed',sans-serif" }}>EX</span>
+                </div>
+              </div>
+              <div style={{ display:"flex", alignItems:"baseline", gap:5 }}>
+                <span style={{ fontFamily:"'Spectral',Georgia,serif", fontWeight:700, fontSize:18, color:tk.ink }}>Eventix</span>
+                <span style={{ fontFamily:"'Barlow Condensed',sans-serif", fontWeight:900, fontSize:14, letterSpacing:"0.08em", color:tk.gold }}>SPACE</span>
+              </div>
+              <span style={{ fontSize:9, fontWeight:800, letterSpacing:"0.15em", textTransform:"uppercase", color:tk.ink3, border:`1px solid ${tk.border}`, padding:"2px 8px", borderRadius:99, fontFamily:"'Barlow Condensed',sans-serif" }}>by eventimist</span>
+            </div>
+
+            {/* Links + dark toggle */}
+            <div style={{ display:"flex", alignItems:"center", gap:20 }}>
+              <div style={{ display:"flex", gap:20 }}>
+                {[["Features","#features"],["Pricing","#pricing"],["Domains","#domains"]].map(([l,h])=>(
+                  <a key={l} href={h} style={{ fontSize:11, fontWeight:800, letterSpacing:"0.12em", textTransform:"uppercase", color:tk.ink3, textDecoration:"none", fontFamily:"'Barlow Condensed',sans-serif", transition:"color .2s" }}
+                    onMouseOver={e=>((e.target as HTMLElement).style.color=tk.gold)}
+                    onMouseOut={e=>((e.target as HTMLElement).style.color=tk.ink3)}>{l}</a>
+                ))}
+              </div>
+              {/* Dark toggle */}
+              <button onClick={()=>setDark(d=>!d)} style={{
+                width:36, height:36, borderRadius:10, border:`1.5px solid ${tk.border}`,
+                background:tk.bgAlt, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:15, transition:"all .2s", color:tk.ink,
+              }} title={dark?"Switch to light":"Switch to dark"}>
+                {dark ? "☀️" : "🌙"}
+              </button>
+              <a href="#auth" style={{
+                fontSize:11, fontWeight:900, letterSpacing:"0.12em", textTransform:"uppercase",
+                padding:"9px 20px", borderRadius:10, background:tk.gold, color:"#fff",
+                textDecoration:"none", fontFamily:"'Barlow Condensed',sans-serif", transition:"filter .2s",
+              }}
+              onMouseOver={e=>((e.target as HTMLElement).style.filter="brightness(1.08)")}
+              onMouseOut={e=>((e.target as HTMLElement).style.filter="")}>
+                Register Org
+              </a>
+            </div>
+          </div>
+        </nav>
+
+        {/* ── Hero ── */}
+        <section style={{ maxWidth:1100, margin:"0 auto", padding:"72px 24px 56px", display:"grid", gridTemplateColumns:"1fr 420px", gap:64, alignItems:"center" }}>
+          {/* Left */}
+          <div style={{ opacity: vis?1:0, transform: vis?"translateY(0)":"translateY(20px)", transition:"opacity .6s, transform .6s" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:24 }}>
+              <div style={{ width:6, height:6, borderRadius:"50%", background:tk.gold }} className="pulse-green"/>
+              <span style={{ fontSize:9, fontWeight:900, letterSpacing:"0.25em", textTransform:"uppercase", color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif" }}>Organisation-first event space</span>
+            </div>
+            <h1 style={{ margin:"0 0 20px", fontFamily:"'Spectral',Georgia,serif", fontWeight:700, lineHeight:0.95, color:tk.ink }}>
+              <span style={{ display:"block", fontSize:"clamp(46px,6vw,82px)" }}>Your org.</span>
+              <span style={{ display:"block", fontSize:"clamp(46px,6vw,82px)", fontStyle:"italic", color:tk.gold }}>Your space.</span>
+              <span style={{ display:"block", fontSize:"clamp(46px,6vw,82px)", color:tk.ink3 }}>Verified.</span>
+            </h1>
+            <p style={{ fontSize:15, color:tk.ink2, lineHeight:1.75, maxWidth:440, marginBottom:32, fontFamily:"'Libre Baskerville',Georgia,serif" }}>
+              A domain-verified private hub where organisations host events and members join automatically — no invite chaos, no outsiders, no friction.
+            </p>
+            {/* Stats */}
+            <div style={{ display:"flex", gap:0 }}>
+              {[{ n:"2,100+", l:"Organisations" },{ n:"840K+", l:"Members" },{ n:"18K+", l:"Events" }].map((s,i)=>(
+                <div key={s.l} style={{ paddingRight:28, paddingLeft: i>0?28:0, borderLeft: i>0?`1.5px solid ${tk.border}`:"none" }}>
+                  <div style={{ fontFamily:"'Spectral',Georgia,serif", fontWeight:700, fontSize:26, color:tk.ink, lineHeight:1 }}>{s.n}</div>
+                  <div style={{ fontSize:10, fontWeight:800, letterSpacing:"0.15em", textTransform:"uppercase", color:tk.ink3, marginTop:4, fontFamily:"'Barlow Condensed',sans-serif" }}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+            {/* Domain badge */}
+            <div style={{ marginTop:28, display:"inline-flex", alignItems:"center", gap:10, border:`1.5px solid ${tk.goldBdr}`, borderRadius:12, padding:"10px 16px", background:tk.goldBg }}>
+              <svg style={{ width:16, height:16, color:tk.gold, flexShrink:0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              <span style={{ fontSize:12, color:tk.ink2, fontFamily:"'Libre Baskerville',serif" }}>
+                <span style={{ fontFamily:"monospace", color:tk.gold }}>@yourcompany.com</span> → all members auto-join
+              </span>
+            </div>
+          </div>
+
+          {/* Right: auth panel */}
+          <div id="auth" style={{ opacity: vis?1:0, transform: vis?"translateY(0)":"translateY(24px)", transition:"opacity .7s .1s, transform .7s .1s" }}>
+            <AuthPanel tk={tk}/>
+          </div>
+        </section>
+
+        {/* ── Wall Carousel ── */}
+        <section style={{ padding:"24px 0 56px", background: dark ? tk.bgAlt : tk.wall, borderTop:`1.5px solid ${tk.border}`, borderBottom:`1.5px solid ${tk.border}` }}>
+          <div style={{ maxWidth:1100, margin:"0 auto", padding:"0 24px" }}>
+            <div style={{ textAlign:"center", marginBottom:8 }}>
+              <span style={{ fontSize:9, fontWeight:900, letterSpacing:"0.25em", textTransform:"uppercase", color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif" }}>
+                Organisations using Eventix
+              </span>
+            </div>
+            <WallCarousel tk={tk}/>
+          </div>
+        </section>
+
+        {/* ── Org marquee ── */}
+        <div style={{ background:tk.ink, overflow:"hidden", padding:"12px 0", borderTop:`1.5px solid ${tk.border}` }}>
+          <div className="marquee-ltr" style={{ display:"flex", gap:0 }}>
+            {[...ORGS,...ORGS,...ORGS].map((o,i) => (
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:8, padding:"0 28px", flexShrink:0 }}>
+                <div style={{ width:20, height:20, borderRadius:5, background:`hsl(${o.h},50%,40%)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <span style={{ fontSize:8, fontWeight:900, color:"#fff", fontFamily:"'Barlow Condensed',sans-serif" }}>{o.abbr}</span>
+                </div>
+                <span style={{ fontSize:10, fontWeight:800, letterSpacing:"0.15em", textTransform:"uppercase", color:"rgba(255,255,255,.3)", fontFamily:"'Barlow Condensed',sans-serif", whiteSpace:"nowrap" }}>{o.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Features tk={tk} dark={dark}/>
+        <Pricing tk={tk}/>
+        <DomainSection tk={tk}/>
+        <Footer tk={tk}/>
       </div>
     </>
   );
