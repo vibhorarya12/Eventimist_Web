@@ -4,18 +4,32 @@ import { persist } from "zustand/middleware";
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 interface UserAuthState {
-  name:        string;
-  email:       string;
-  profilePic:  string | null;
-  accessToken: string;
+  name:                 string;
+  email:                string;
+  profilePic:           string | null;
+  accessToken:          string;
+  rsvpEventIds:         number[];
+  bookmarkedEventIds:   number[];
+  interactionsLoaded:   boolean;
 
   // Actions
-  setAuth:    (data: Omit<UserAuthState, "setAuth" | "clearAuth" | "isAuthenticated">) => void;
-  clearAuth:  () => void;
-  isAuthenticated: () => boolean;
+  setAuth:              (data: Omit<UserAuthState, "setAuth" | "clearAuth" | "isAuthenticated" | "setRsvpEventIds" | "setBookmarkedEventIds" | "setInteractionsLoaded">) => void;
+  clearAuth:            () => void;
+  isAuthenticated:      () => boolean;
+  setRsvpEventIds:      (ids: number[]) => void;
+  setBookmarkedEventIds:(ids: number[]) => void;
+  setInteractionsLoaded:(loaded: boolean) => void;
 }
 
-const EMPTY = { name: "", email: "", profilePic: null, accessToken: "" };
+const EMPTY = {
+  name: "",
+  email: "",
+  profilePic: null,
+  accessToken: "",
+  rsvpEventIds: [],
+  bookmarkedEventIds: [],
+  interactionsLoaded: false,
+};
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 export const useUserAuth = create<UserAuthState>()(
@@ -28,14 +42,21 @@ export const useUserAuth = create<UserAuthState>()(
       clearAuth: () => set({ ...EMPTY }),
 
       isAuthenticated: () => !!get().accessToken,
+
+      setRsvpEventIds: (ids) => set({ rsvpEventIds: ids }),
+      setBookmarkedEventIds: (ids) => set({ bookmarkedEventIds: ids }),
+      setInteractionsLoaded: (loaded) => set({ interactionsLoaded: loaded }),
     }),
     {
       name: "user-auth",      // localStorage key
       partialize: (s) => ({   // don't persist actions
-        name:        s.name,
-        email:       s.email,
-        profilePic:  s.profilePic,
-        accessToken: s.accessToken,
+        name:               s.name,
+        email:              s.email,
+        profilePic:         s.profilePic,
+        accessToken:        s.accessToken,
+        rsvpEventIds:       s.rsvpEventIds,
+        bookmarkedEventIds: s.bookmarkedEventIds,
+        interactionsLoaded: s.interactionsLoaded,
       }),
     }
   )
@@ -45,4 +66,7 @@ export const useUserAuth = create<UserAuthState>()(
 export const useUserName       = () => useUserAuth(s => s.name);
 export const useUserEmail      = () => useUserAuth(s => s.email);
 export const useUserProfilePic = () => useUserAuth(s => s.profilePic);
-export const useUserToken      = () => useUserAuth(s => s.accessToken);
+export const useUserToken               = () => useUserAuth(s => s.accessToken);
+export const useUserRsvpEventIds        = () => useUserAuth(s => s.rsvpEventIds);
+export const useUserBookmarkedEventIds  = () => useUserAuth(s => s.bookmarkedEventIds);
+export const useUserInteractionsLoaded  = () => useUserAuth(s => s.interactionsLoaded);
