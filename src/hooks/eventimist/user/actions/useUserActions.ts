@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import {
   rsvpEvent,
+  removeRsvpEvent,
   getUserEventInteractions,
   type RsvpEventRequest,
   type RsvpEventResponse,
@@ -27,6 +28,10 @@ export interface UseUserActionsReturn {
       token: string,
       body?: RsvpEventRequest
     ) => Promise<RsvpEventResponse | null>;
+    remove: (
+      eventId: number,
+      token: string
+    ) => Promise<RsvpEventResponse | null>;
     loading: boolean;
     error: string | null;
     reset: () => void;
@@ -46,6 +51,8 @@ export function useUserActions(
   // ─── RSVP State ────────────────────────────────────────────────────────────
   const [rsvpLoading, setRsvpLoading] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
+  const rsvpEventIds = useUserAuth((s) => s.rsvpEventIds);
+const safeIds = Array.isArray(rsvpEventIds) ? rsvpEventIds : [];
 
   // ─── Zustand Store Actions ────────────────────────────────────────────────
   const setRsvpEventIds = useUserAuth(
@@ -107,6 +114,42 @@ export function useUserActions(
         token,
         body
       );
+    setRsvpEventIds([...safeIds, eventId]);
+      return data;
+    } catch (err: any) {
+      const serverErr = err?.response?.data as
+        | RsvpEventError
+        | undefined;
+
+      if (serverErr?.message) {
+        setRsvpError(serverErr.message);
+      } else if (err?.response?.status === 401) {
+        setRsvpError(
+          "Unauthorized. Please sign in again."
+        );
+      } else {
+        setRsvpError(
+          "Something went wrong. Please try again."
+        );
+      }
+
+      return null;
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
+  const removeRsvpSubmit = async (
+    eventId: number,
+    token: string
+  ): Promise<RsvpEventResponse | null> => {
+    setRsvpLoading(true);
+    setRsvpError(null);
+
+    try {
+      const data = await removeRsvpEvent(eventId, token);
+      setRsvpEventIds(safeIds.filter((id) => id !== eventId));
+      
 
       return data;
     } catch (err: any) {
@@ -142,6 +185,7 @@ export function useUserActions(
   return {
     rsvpEvent: {
       submit: rsvpSubmit,
+      remove: removeRsvpSubmit,
       loading: rsvpLoading,
       error: rsvpError,
       reset: rsvpReset,
