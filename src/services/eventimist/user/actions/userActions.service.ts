@@ -52,3 +52,18 @@ export async function rsvpEvent(
   return res.data;
 }
 
+export async function removeRsvpEvent(
+  eventId: number,
+  token: string
+): Promise<RsvpEventResponse> {
+  const res = await eventimistClient.delete<RsvpEventResponse>(
+    `/user/events/rsvp/${eventId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return res.data;
+}
+
