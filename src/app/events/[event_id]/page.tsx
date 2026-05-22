@@ -5,8 +5,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useGetEvent } from "@/hooks/eventimist/user/events/useGetEvent";
+import { useUserActions } from "@/hooks/eventimist/user/actions/useUserActions";
+import {useUserAuth, useUserToken, useUserInteractionsLoaded, useUserRsvpEventIds } from "@/store/eventimist/user/auth/UserAuthState";
 import { QueryProvider } from "@/components/QueryProvider";
 import type { GetEventResponse } from "@/services/eventimist/user/events/GetEvent.service";
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const CATEGORY_META: Record<string, { emoji: string; color: string }> = {
@@ -98,47 +101,126 @@ function Carousel({ images }: { images: string[] }) {
 }
 
 // ─── RSVP Button ──────────────────────────────────────────────────────────────
-function RSVPButton({ rsvped, count }: { rsvped: boolean; count: number }) {
-  const [state, setState] = useState<"idle"|"loading"|"done">(rsvped ? "done" : "idle");
-  const [cnt,   setCnt]   = useState(count);
+function RSVPButton({ eventId, count }: { eventId: number; count: number }) {
+  const token = useUserToken();
+  const interactionsLoaded = useUserInteractionsLoaded();
+
+  const { rsvpEvent, getUserInteractions } = useUserActions(token);
+   
+  const rsvpEventIds = useUserRsvpEventIds();
+const safeIds = Array.isArray(rsvpEventIds) ? rsvpEventIds : [];
+
+const alreadyRsvped =
+  interactionsLoaded && !!token && safeIds.includes(eventId);
+
+  const [state, setState] = useState<"idle" | "loading" | "done">(
+    alreadyRsvped ? "done" : "idle"
+  );
+  const [cnt, setCnt] = useState(count);
+  const [showError, setShowError] = useState(false);
+
+  useEffect(() => {
+    if (interactionsLoaded) {
+      setState(alreadyRsvped ? "done" : "idle");
+    }
+  }, [alreadyRsvped, interactionsLoaded]);
+
+  useEffect(() => {
+    if (token && !interactionsLoaded && !getUserInteractions.loading) {
+      getUserInteractions.refetch();
+    }
+  }, [token, interactionsLoaded, getUserInteractions]);
+
+  const isDisabled = state === "loading" || rsvpEvent.loading || getUserInteractions.loading;
 
   const handle = async () => {
-    if (state === "done") return;
+    if (!token) {
+      setShowError(true);
+      setTimeout(() => setShowError(false), 3000);
+      return;
+    }
+
     setState("loading");
-    await new Promise(r => setTimeout(r,1000));
-    setState("done"); setCnt(c => c+1);
+
+    if (alreadyRsvped) {
+      // ── Un-RSVP ──
+      const res = await rsvpEvent.remove(eventId, token);
+      if (res) {
+        setState("idle");
+        setCnt((c) => Math.max(0, c - 1));
+      } else {
+        setState("done");
+        setShowError(true);
+        setTimeout(() => setShowError(false), 3000);
+      }
+    } else {
+      // ── RSVP ──
+      const res = await rsvpEvent.submit(eventId, token);
+      if (res) {
+        setState("done");
+        setCnt((c) => c + 1);
+      } else {
+        setState("idle");
+        setShowError(true);
+        setTimeout(() => setShowError(false), 3000);
+      }
+    }
   };
 
   return (
-    <button onClick={handle} disabled={state==="loading" || state==="done"}
-      className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 disabled:cursor-default"
-      style={{
-        background: state==="done"
-          ? "linear-gradient(135deg,#14532d,#166534)"
-          : "linear-gradient(135deg,#1c1917,#292524)",
-        color: "white",
-        boxShadow: state==="done"
-          ? "0 4px 16px rgba(20,83,45,.35)"
-          : "0 4px 16px rgba(0,0,0,.25)",
-      }}>
-      {state==="loading" ? (
-        <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-        </svg>Reserving…</>
-      ) : state==="done" ? (
-        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
-        </svg>You're going! · {cnt} attending</>
-      ) : (
-        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-          <path d="M2 9a3 3 0 010 6v2a2 2 0 002 2h16a2 2 0 002-2v-2a3 3 0 010-6V7a2 2 0 00-2-2H4a2 2 0 00-2 2v2z"/>
-        </svg>Reserve Free Spot</>
+    <div className="space-y-2">
+      <button
+        onClick={handle}
+        disabled={isDisabled}
+        className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 hover:cursor-pointer"
+        style={{
+          background:
+            state === "done"
+              ? "linear-gradient(135deg,#14532d,#166534)"
+              : state === "loading"
+              ? "linear-gradient(135deg,#44403c,#57534e)"
+              : "linear-gradient(135deg,#1c1917,#292524)",
+          color: "white",
+          boxShadow:
+            state === "done"
+              ? "0 4px 16px rgba(20,83,45,.35)"
+              : "0 4px 16px rgba(0,0,0,.25)",
+        }}
+      >
+        {state === "loading" ? (
+          <>
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {alreadyRsvped ? "Cancelling…" : "Reserving…"}
+          </>
+        ) : state === "done" ? (
+          <>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            You're going! · {cnt} attending · Cancel
+          </>
+        ) : (
+          <>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path d="M2 9a3 3 0 010 6v2a2 2 0 002 2h16a2 2 0 002-2v-2a3 3 0 010-6V7a2 2 0 00-2-2H4a2 2 0 00-2 2v2z" />
+            </svg>
+            Reserve Free Spot
+          </>
+        )}
+      </button>
+      {showError && (
+        <p className="text-xs text-red-600 text-center">
+          {!token
+            ? "Please sign in to reserve a spot"
+            : rsvpEvent.error || "Failed. Please try again."}
+        </p>
       )}
-    </button>
+    </div>
   );
 }
-
 // ─── Add to Calendar ──────────────────────────────────────────────────────────
 function addToCalendar(event: GetEventResponse) {
   const start  = event.startTime.replace(/[-:]/g,"").slice(0,15)+"Z";
@@ -455,7 +537,7 @@ function EventViewPageInner() {
                     <OccupancyBar rsvp={ev.rsvpCount} attendance={ev.attendance}/>
                   </div>
                   <div className="p-5 space-y-3">
-                    <RSVPButton rsvped={false} count={ev.rsvpCount}/>
+                   <RSVPButton eventId={ev.id} count={ev.rsvpCount} />
                     <p className="text-center text-[10px] text-stone-400 font-medium">
                       No registration fee · Instant confirmation
                     </p>
