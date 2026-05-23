@@ -12,9 +12,13 @@ const eventimistClient = axios.create({
 // ─── Request interceptor — attach token on every call ─────────────────────────
 eventimistClient.interceptors.request.use(
   (config) => {
-    const token = useOrganizerAuth.getState().accessToken;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Skip auto-setting organizer token if Authorization header is already set
+    // This allows user endpoints to pass their own user token
+    if (!config.headers.Authorization) {
+      const token = useOrganizerAuth.getState().accessToken;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     // When the body is FormData, delete the global Content-Type so axios can
     // set "multipart/form-data; boundary=..." automatically. If left as
@@ -34,8 +38,11 @@ eventimistClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      useOrganizerAuth.getState().clearAuth();
-      window.location.href = "/organizer/auth";
+      // Only redirect to organizer auth if this is an organizer endpoint
+      if (error.config?.url?.includes("/organizer/") || error.config?.url?.includes("/auth/organizer")) {
+        useOrganizerAuth.getState().clearAuth();
+        window.location.href = "/organizer/auth";
+      }
     }
     return Promise.reject(error);
   }
