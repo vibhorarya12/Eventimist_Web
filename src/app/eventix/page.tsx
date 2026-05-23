@@ -76,11 +76,11 @@ function WallCarousel({ tk }: { tk: typeof LIGHT }) {
   const go = useCallback((i: number) => {
     setIdx(i);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setIdx(j => (j+1)%GALLERY.length), 4500);
+    timer.current = setTimeout(() => setIdx(j => (j+1)%GALLERY.length), 3000);
   }, []);
 
   useEffect(() => {
-    timer.current = setTimeout(() => go((idx+1)%GALLERY.length), 4500);
+    timer.current = setTimeout(() => go((idx+1)%GALLERY.length), 3000);
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [idx, go]);
 
