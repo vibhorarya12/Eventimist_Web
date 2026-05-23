@@ -6,6 +6,8 @@ import { useCreateEvent } from "@/hooks/eventimist/organizer/event/useCreateEven
 import type { CreateEventRequest, EventCategory, EventMode } from "@/services/eventimist/organizer/event/Createevent.service";
 import { compressImages, type CompressionResult } from "@/utils/compressImages";
 
+import {AIGenerateButton} from "@/components/AIGenerateButton"
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Category =
   | "MUSIC" | "TECH" | "FOOD" | "ART" | "SPORTS"
@@ -946,8 +948,26 @@ export default function CreateEventPage() {
               Got it!
             </button>
           </div>
+
+   
+
         </div>
       )}
+
+
+            <AIGenerateButton
+  dark={dark}
+  onApply={(data) => {
+    if (data.title)       set("title",       data.title);
+    if (data.description) set("description", data.description);
+    if (data.category)    set("category",    data.category as Category);
+    if (data.mode)        set("mode",        data.mode as Mode);
+    if (data.capacity)    set("capacity",    data.capacity);
+    if (data.startTime)   set("startTime",   data.startTime);
+    if (data.endTime)     set("endTime",     data.endTime);
+    if (data.tags)        set("tags",        data.tags);
+  }}
+/>
     </>
   );
 }
