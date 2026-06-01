@@ -447,6 +447,239 @@ function HowItWorks() {
   );
 }
 
+// ─── VideoSection — paste this component into your landing page ───────────────
+// Place <VideoSection /> right after <Stats /> and before <Features />
+
+function VideoSection() {
+  const [playing, setPlaying] = useState(false);
+
+  return (
+    <section className="relative py-28 px-6 overflow-hidden bg-stone-900">
+      {/* Background layers */}
+      <div className="absolute inset-0 pointer-events-none">
+        {/* Grain texture */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E\")",
+            backgroundSize: "256px 256px",
+          }}
+        />
+        {/* Amber glow left */}
+        <div
+          className="absolute -left-32 top-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(251,191,36,0.12) 0%, transparent 70%)" }}
+        />
+        {/* Orange glow right */}
+        <div
+          className="absolute -right-32 top-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(249,115,22,0.08) 0%, transparent 70%)" }}
+        />
+        {/* Subtle grid */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+          }}
+        />
+      </div>
+
+      <div className="max-w-6xl mx-auto relative z-10">
+
+        {/* Header */}
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2.5 bg-amber-400/10 border border-amber-400/20 rounded-full px-5 py-2 mb-7">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#fbbf24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <span className="text-amber-400 text-[11px] font-black tracking-widest uppercase">See it in action</span>
+          </div>
+          <h2
+            className="text-white text-5xl lg:text-6xl font-black leading-tight mb-5"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          >
+            Watch Eventimist
+            <br />
+            <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 bg-clip-text text-transparent">
+              Come to Life
+            </span>
+          </h2>
+          <p className="text-stone-400 text-lg max-w-xl mx-auto leading-relaxed">
+            See how organizers, volunteers, and communities use Eventimist to create unforgettable experiences.
+          </p>
+        </div>
+
+        {/* Video frame */}
+        <div className="relative max-w-4xl mx-auto">
+
+          {/* Decorative corner accents */}
+          <div className="absolute -top-3 -left-3 w-12 h-12 border-t-2 border-l-2 border-amber-400/40 rounded-tl-2xl pointer-events-none z-20" />
+          <div className="absolute -top-3 -right-3 w-12 h-12 border-t-2 border-r-2 border-amber-400/40 rounded-tr-2xl pointer-events-none z-20" />
+          <div className="absolute -bottom-3 -left-3 w-12 h-12 border-b-2 border-l-2 border-amber-400/40 rounded-bl-2xl pointer-events-none z-20" />
+          <div className="absolute -bottom-3 -right-3 w-12 h-12 border-b-2 border-r-2 border-amber-400/40 rounded-br-2xl pointer-events-none z-20" />
+
+          {/* Glow behind video */}
+          <div
+            className="absolute inset-0 rounded-3xl pointer-events-none"
+            style={{
+              boxShadow: "0 0 80px rgba(251,191,36,0.15), 0 0 160px rgba(249,115,22,0.08)",
+              transform: "scale(1.02)",
+            }}
+          />
+
+          {/* Video container */}
+          <div
+            className="relative rounded-3xl overflow-hidden"
+            style={{
+              aspectRatio: "16/9",
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "#0a0a0a",
+            }}
+          >
+            {!playing ? (
+              /* Thumbnail / play state */
+              <>
+                {/* YouTube thumbnail */}
+                <img
+                  src="https://img.youtube.com/vi/XRzcnvwyrCg/maxresdefault.jpg"
+                  alt="Eventimist demo video"
+                  className="w-full h-full object-cover"
+                  style={{ filter: "brightness(0.65)" }}
+                />
+
+                {/* Overlay gradient */}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.3) 100%)",
+                  }}
+                />
+
+                {/* Duration badge */}
+                <div
+                  className="absolute top-5 right-5 text-[10px] font-black text-white px-2.5 py-1 rounded-lg tracking-wider"
+                  style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.1)" }}
+                >
+                  DEMO
+                </div>
+
+                {/* Center play button */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <button
+                    onClick={() => setPlaying(true)}
+                    className="group relative flex items-center justify-center transition-transform duration-300 hover:scale-110 active:scale-95"
+                  >
+                    {/* Pulse rings */}
+                    <span
+                      className="absolute w-28 h-28 rounded-full border border-amber-400/20"
+                      style={{ animation: "videoPulse 2.4s ease-out infinite" }}
+                    />
+                    <span
+                      className="absolute w-20 h-20 rounded-full border border-amber-400/30"
+                      style={{ animation: "videoPulse 2.4s ease-out 0.6s infinite" }}
+                    />
+                    {/* Button itself */}
+                    <div
+                      className="relative w-16 h-16 rounded-full flex items-center justify-center"
+                      style={{
+                        background: "linear-gradient(135deg,#f59e0b,#fbbf24)",
+                        boxShadow: "0 8px 32px rgba(251,191,36,0.5)",
+                      }}
+                    >
+                      <svg
+                        className="w-7 h-7 ml-1"
+                        viewBox="0 0 24 24"
+                        fill="#1c1917"
+                      >
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Bottom info bar */}
+                <div className="absolute bottom-0 left-0 right-0 px-7 py-5 flex items-center justify-between">
+                  <div>
+                    <p
+                      className="text-white font-black text-lg leading-tight"
+                      style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                    >
+                      Eventimist Platform Overview
+                    </p>
+                    <p className="text-white/50 text-sm mt-0.5">
+                      Discover · Organize · Volunteer
+                    </p>
+                  </div>
+                  <div
+                    className="hidden sm:flex items-center gap-2 text-[11px] font-bold text-white/70 px-3 py-1.5 rounded-full"
+                    style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58z"/>
+                      <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white" stroke="none"/>
+                    </svg>
+                    Watch on YouTube
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Actual YouTube embed — loads on click */
+              <iframe
+                className="w-full h-full"
+                src="https://www.youtube.com/embed/XRzcnvwyrCg?autoplay=1&rel=0&modestbranding=1&color=white"
+                title="Eventimist Platform Overview"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ border: "none" }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Bottom stats row */}
+        <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
+          {[
+            { val: "2 min",  label: "Quick overview" },
+            { val: "4 roles", label: "Covered in demo" },
+            { val: "Free",   label: "To get started" },
+            { val: "100%",   label: "Made in India 🇮🇳" },
+          ].map((s, i) => (
+            <div
+              key={i}
+              className="text-center py-4 px-3 rounded-2xl"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.06)",
+              }}
+            >
+              <p
+                className="text-amber-400 font-black text-xl mb-1"
+                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+              >
+                {s.val}
+              </p>
+              <p className="text-stone-500 text-xs">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* CSS for pulse animation */}
+        <style>{`
+          @keyframes videoPulse {
+            0%   { transform: scale(0.8); opacity: 0.6; }
+            100% { transform: scale(1.6); opacity: 0; }
+          }
+        `}</style>
+      </div>
+    </section>
+  );
+}
+
+
+
+
 // ─── Volunteer Section ───────────────────────────────────────────────────────
 function VolunteerSection() {
   return (
@@ -698,7 +931,8 @@ export default function Page() {
       <div className="min-h-screen bg-white text-stone-900">
         <Nav />
         <Hero />
-        <Stats />
+        {/* <Stats /> */}
+        <VideoSection/>
         <Features />
         <HowItWorks />
         <VolunteerSection />
