@@ -2,11 +2,16 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { TYPE_META } from "@/components/EventCard";
-import { useOrganizerAuth } from "@/store/eventimist/organizer/auth/AuthState";
+import { useOrganizerAuth ,useSubscriptionLoaded, useOrganizerSubscription} from "@/store/eventimist/organizer/auth/AuthState";
 import { useOrganizerLogout } from "@/hooks/eventimist/organizer/sessions/useOrganizerLogout";
 import { useOrganizerEvents } from "@/hooks/eventimist/organizer/event/useOrganizerEvents";
 import { usePublishEvent } from "@/hooks/eventimist/organizer/event/usePublishEvent";
 import type { OrganizerEvent } from "@/services/eventimist/organizer/event/getOrganizerEvents.service";
+
+import { useSubscriptionAction } from "@/hooks/eventimist/organizer/subscriptions/useSuscriptionAction";
+import { PricingModal } from "@/components/PricingModal";
+import { OrganizerAssistant } from "@/components/OrganizerAssistant";
+
 
 // ─── Local shape used by UI components ───────────────────────────────────────
 // Mapped from OrganizerEvent (API) so the rest of the UI stays unchanged.
@@ -969,6 +974,20 @@ export default function OrganizerDashboard() {
     const saved = localStorage.getItem("org-dashboard-dark");
     if (saved === "1") setDark(true);
   }, []);
+  
+
+   const subscriptionLoaded = useSubscriptionLoaded();
+  const subscription       = useOrganizerSubscription();
+ const [showPricing, setShowPricing] = useState(false);
+  // Fetch subscription only once — skip if already loaded from a previous session
+  const { refetch: refetchSubscription } = useSubscriptionAction();
+ 
+  useEffect(() => {
+    if (!subscriptionLoaded) {
+      refetchSubscription();
+    }
+  }, [subscriptionLoaded, refetchSubscription]);
+
 
   const toggleDark = () => setDark(prev => {
     const next = !prev;
@@ -995,6 +1014,12 @@ export default function OrganizerDashboard() {
   };
 
   // ── Sidebar (shared between desktop and mobile overlay) ────────────────────
+
+
+
+
+
+
   const SidebarContent = () => (
     <div className={`flex flex-col h-full ${T.surface(dark)} transition-colors duration-300`}>
       {/* Logo */}
@@ -1012,7 +1037,7 @@ export default function OrganizerDashboard() {
 
       {/* Create CTA */}
       <div className="px-4 py-4">
-        <a href="/organizer/create_event" className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-sm py-3 rounded-2xl hover:shadow-xl hover:shadow-amber-400/25 hover:scale-[1.02] transition-all">
+        <a href="/organizer/create-event" className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-sm py-3 rounded-2xl hover:shadow-xl hover:shadow-amber-400/25 hover:scale-[1.02] transition-all">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Create Event
         </a>
@@ -1087,6 +1112,15 @@ export default function OrganizerDashboard() {
           onClose={() => setPublishEventId(null)}
         />
       )}
+      
+    {/* <PricingModal
+  currentPlan={subscription?.plan ?? "FREE"}
+  dark={dark}
+  onUpgrade={() => setShowPricing(false)}
+/> */}
+
+
+      <OrganizerAssistant dark={dark} />
 
       <div className={`flex min-h-screen ${T.bg(dark)} transition-colors duration-300`}>
 
@@ -1149,7 +1183,7 @@ export default function OrganizerDashboard() {
               {profilePic ? <img src={profilePic} alt={name??""} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-2 ring-amber-400/30 cursor-pointer"/> :
                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-400/15 ring-2 ring-amber-400/25 flex items-center justify-center text-amber-500 font-black text-sm cursor-pointer">{avatarFallback}</div>}
 
-              <a href="/organizer/create_event" className="hidden sm:flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-amber-500 to-orange-600 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl hover:shadow-lg hover:shadow-amber-500/25 transition-all">
+              <a href="/organizer/create-event" className="hidden sm:flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-amber-500 to-orange-600 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl hover:shadow-lg hover:shadow-amber-500/25 transition-all">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span className="hidden md:inline">Create Event</span>
                 <span className="md:hidden">New</span>
@@ -1185,6 +1219,7 @@ export default function OrganizerDashboard() {
           </main>
         </div>
       </div>
+      
     </>
   );
 }
