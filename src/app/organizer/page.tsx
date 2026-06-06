@@ -6,7 +6,7 @@ import { useOrganizerAuth } from "@/store/eventimist/organizer/auth/AuthState";
 
 export default function OrganizerGuardPage() {
   const router      = useRouter();
-  const isAuthenticated = useOrganizerAuth((s) => s.isAuthenticated());
+  const isAuthenticated = useOrganizerAuth((s) => s.isAuthenticated);
 
   useEffect(() => {
     if (isAuthenticated) {
