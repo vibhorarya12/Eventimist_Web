@@ -962,7 +962,7 @@ export default function CreateEventPage() {
     if (data.description) set("description", data.description);
     if (data.category)    set("category",    data.category as Category);
     if (data.mode)        set("mode",        data.mode as Mode);
-    if (data.capacity)    set("capacity",    data.capacity);
+    
     if (data.startTime)   set("startTime",   data.startTime);
     if (data.endTime)     set("endTime",     data.endTime);
     if (data.tags)        set("tags",        data.tags);
