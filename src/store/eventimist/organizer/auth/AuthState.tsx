@@ -14,112 +14,272 @@ import { persist, createJSONStorage } from "zustand/middleware";
 //     your backend to set the Set-Cookie header and you to handle CSRF.
 //
 // Upgrade path when ready:
-//   1. Have your backend set:  Set-Cookie: token=...; HttpOnly; Secure; SameSite=Strict
+//   1. Have your backend set: Set-Cookie: token=...; HttpOnly; Secure; SameSite=Strict
 //   2. Remove accessToken from this store entirely.
-//   3. All requests will carry the cookie automatically — no manual header needed.
+//   3. All requests will carry the cookie automatically.
 //
 // For now, localStorage is fine as long as you keep a tight Content-Security-Policy
 // and sanitise any user-generated content rendered on the page.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── Shape returned by the backend ───────────────────────────────────────────
+// ─── Subscription Shape ──────────────────────────────────────────────────────
+export interface OrganizerSubscription {
+  plan: "FREE" | "PRO" ;
+
+  aiCreditsRemaining: number;
+
+  aiCreditsTotal: number;
+
+  eventLimit: number;
+
+  canUseAI: boolean;
+
+  expiresAt: string | null;
+}
+
+// ─── Store State ────────────────────────────────────────────────────────────
 export interface AuthState {
-  name:         string | null;
-  email:        string | null;
-  bio:          string | null;
-  profilePic:   string | null;
-  coverImage:   string | null;
-  location:     string | null;
-  accessToken:  string | null;
+  name: string | null;
+
+  email: string | null;
+
+  bio: string | null;
+
+  profilePic: string | null;
+
+  coverImage: string | null;
+
+  location: string | null;
+
+  accessToken: string | null;
+
+  subscription: OrganizerSubscription | null;
+
+  subscriptionLoaded: boolean;
+
+  isAuthenticated: boolean;
+
+  isHydrated: boolean;
 }
 
-// ─── Actions available on the store ──────────────────────────────────────────
+// ─── Store Actions ──────────────────────────────────────────────────────────
 interface AuthActions {
-  /** Hydrate the whole profile + token at once — call this after a successful login */
-  setAuth:         (data: AuthState) => void;
+  // Bulk setter after login/register
+  setAuth: (data: Partial<AuthState>) => void;
 
-  /** Granular field updates — useful for settings form partial saves */
-  setName:         (name: string | null)        => void;
-  setEmail:        (email: string | null)       => void;
-  setBio:          (bio: string | null)         => void;
-  setProfilePic:   (url: string | null)         => void;
-  setCoverImage:   (url: string | null)         => void;
-  setLocation:     (location: string | null)    => void;
+  // Profile setters
+  setName: (name: string | null) => void;
 
-  /** Update token independently — e.g. after a silent token refresh */
-  setAccessToken:  (token: string | null)       => void;
+  setEmail: (email: string | null) => void;
 
-  /** Wipe everything — call on logout */
-  clearAuth:       () => void;
+  setBio: (bio: string | null) => void;
 
-  /** Derived: true when a valid token is present */
-  isAuthenticated: () => boolean;
+  setProfilePic: (url: string | null) => void;
+
+  setCoverImage: (url: string | null) => void;
+
+  setLocation: (location: string | null) => void;
+
+  // Auth token
+  setAccessToken: (token: string | null) => void;
+
+  // Subscription
+  setSubscription: (
+    subscription: OrganizerSubscription | null
+  ) => void;
+
+  setSubscriptionLoaded: (loaded: boolean) => void;
+
+  // Hydration
+  setHydrated: (hydrated: boolean) => void;
+
+  // Logout
+  clearAuth: () => void;
 }
 
-// ─── Initial / empty state ────────────────────────────────────────────────────
+// ─── Initial State ──────────────────────────────────────────────────────────
 const INITIAL: AuthState = {
-  name:        null,
-  email:       null,
-  bio:         null,
-  profilePic:  null,
-  coverImage:  null,
-  location:    null,
+  name: null,
+
+  email: null,
+
+  bio: null,
+
+  profilePic: null,
+
+  coverImage: null,
+
+  location: null,
+
   accessToken: null,
+
+  subscription: null,
+
+  subscriptionLoaded: false,
+
+  isAuthenticated: false,
+
+  isHydrated: false,
 };
 
-// ─── Store ────────────────────────────────────────────────────────────────────
-export const useOrganizerAuth = create<AuthState & AuthActions>()(
-  persist(
-    (set, get) => ({
-      // ── State ──────────────────────────────────────────────────────────────
-      ...INITIAL,
+// ─── Zustand Store ──────────────────────────────────────────────────────────
+export const useOrganizerAuth =
+  create<AuthState & AuthActions>()(
+    persist(
+      (set) => ({
+        // ─── State ──────────────────────────────────────────────────────────
+        ...INITIAL,
 
-      // ── Bulk setter (post-login) ────────────────────────────────────────────
-      setAuth: (data) => set({ ...data }),
+        // ─── Bulk Auth Setter ───────────────────────────────────────────────
+        setAuth: (data) =>
+          set({
+            ...data,
 
-      // ── Granular field setters ──────────────────────────────────────────────
-      setName:        (name)        => set({ name }),
-      setEmail:       (email)       => set({ email }),
-      setBio:         (bio)         => set({ bio }),
-      setProfilePic:  (profilePic)  => set({ profilePic }),
-      setCoverImage:  (coverImage)  => set({ coverImage }),
-      setLocation:    (location)    => set({ location }),
-      setAccessToken: (accessToken) => set({ accessToken }),
+            isAuthenticated: !!data.accessToken,
+          }),
 
-      // ── Logout ─────────────────────────────────────────────────────────────
-      clearAuth: () => set({ ...INITIAL }),
+        // ─── Profile Setters ────────────────────────────────────────────────
+        setName: (name) =>
+          set({
+            name,
+          }),
 
-      // ── Derived: authenticated when a non-null token exists ────────────────
-      isAuthenticated: () => get().accessToken !== null,
-    }),
+        setEmail: (email) =>
+          set({
+            email,
+          }),
 
-    {
-      name:    "organizer-auth",                     // localStorage key
-      storage: createJSONStorage(() => localStorage),
+        setBio: (bio) =>
+          set({
+            bio,
+          }),
 
-      // Persist all state fields — including accessToken.
-      // Actions (functions) are intentionally excluded; they are never serialisable.
-      partialize: (state): AuthState => ({
-        name:        state.name,
-        email:       state.email,
-        bio:         state.bio,
-        profilePic:  state.profilePic,
-        coverImage:  state.coverImage,
-        location:    state.location,
-        accessToken: state.accessToken,
+        setProfilePic: (profilePic) =>
+          set({
+            profilePic,
+          }),
+
+        setCoverImage: (coverImage) =>
+          set({
+            coverImage,
+          }),
+
+        setLocation: (location) =>
+          set({
+            location,
+          }),
+
+        // ─── Token Setter ───────────────────────────────────────────────────
+        setAccessToken: (accessToken) =>
+          set({
+            accessToken,
+
+            isAuthenticated: !!accessToken,
+          }),
+
+        // ─── Subscription ───────────────────────────────────────────────────
+        setSubscription: (subscription) =>
+          set({
+            subscription,
+          }),
+
+        setSubscriptionLoaded: (subscriptionLoaded) =>
+          set({
+            subscriptionLoaded,
+          }),
+
+        // ─── Hydration ──────────────────────────────────────────────────────
+        setHydrated: (isHydrated) =>
+          set({
+            isHydrated,
+          }),
+
+        // ─── Logout ─────────────────────────────────────────────────────────
+        clearAuth: () =>
+          set({
+            ...INITIAL,
+          }),
       }),
-    }
-  )
-);
 
-// ─── Typed selectors ──────────────────────────────────────────────────────────
-// Prefer these over pulling the whole store — each component only re-renders
-// when its specific slice changes.
-export const useOrganizerName        = () => useOrganizerAuth((s) => s.name);
-export const useOrganizerEmail       = () => useOrganizerAuth((s) => s.email);
-export const useOrganizerBio         = () => useOrganizerAuth((s) => s.bio);
-export const useOrganizerProfilePic  = () => useOrganizerAuth((s) => s.profilePic);
-export const useOrganizerCoverImage  = () => useOrganizerAuth((s) => s.coverImage);
-export const useOrganizerLocation    = () => useOrganizerAuth((s) => s.location);
-export const useOrganizerAccessToken = () => useOrganizerAuth((s) => s.accessToken);
-export const useIsOrganizerAuth      = () => useOrganizerAuth((s) => s.isAuthenticated());
+      {
+        name: "organizer-auth",
+
+        storage: createJSONStorage(
+          () => localStorage
+        ),
+
+        // Persist only serializable state
+        partialize: (state): AuthState => ({
+          name: state.name,
+
+          email: state.email,
+
+          bio: state.bio,
+
+          profilePic: state.profilePic,
+
+          coverImage: state.coverImage,
+
+          location: state.location,
+
+          accessToken: state.accessToken,
+
+          subscription: state.subscription,
+
+          subscriptionLoaded:
+            state.subscriptionLoaded,
+
+          isAuthenticated:
+            state.isAuthenticated,
+
+          isHydrated: state.isHydrated,
+        }),
+
+        // Hydration lifecycle
+        onRehydrateStorage: () => (state) => {
+          state?.setHydrated(true);
+        },
+      }
+    )
+  );
+
+// ─── Typed Selectors ────────────────────────────────────────────────────────
+
+export const useOrganizerName = () =>
+  useOrganizerAuth((s) => s.name);
+
+export const useOrganizerEmail = () =>
+  useOrganizerAuth((s) => s.email);
+
+export const useOrganizerBio = () =>
+  useOrganizerAuth((s) => s.bio);
+
+export const useOrganizerProfilePic = () =>
+  useOrganizerAuth((s) => s.profilePic);
+
+export const useOrganizerCoverImage = () =>
+  useOrganizerAuth((s) => s.coverImage);
+
+export const useOrganizerLocation = () =>
+  useOrganizerAuth((s) => s.location);
+
+export const useOrganizerAccessToken = () =>
+  useOrganizerAuth((s) => s.accessToken);
+
+export const useOrganizerSubscription = () =>
+  useOrganizerAuth((s) => s.subscription);
+
+export const useSubscriptionLoaded = () =>
+  useOrganizerAuth(
+    (s) => s.subscriptionLoaded
+  );
+
+export const useIsOrganizerAuthenticated = () =>
+  useOrganizerAuth(
+    (s) => s.isAuthenticated
+  );
+
+export const useIsOrganizerHydrated = () =>
+  useOrganizerAuth(
+    (s) => s.isHydrated
+  );
