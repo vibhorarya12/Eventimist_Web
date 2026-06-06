@@ -4,7 +4,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useOrganizerAiAction } from "@/hooks/eventimist/organizer/Ai/useoOrganizerAiAction";
-import type { GenerateEventDraftResponse } from "@/services/eventimist/organizer/AiService/organizerAiActions.service";
+
+import type { EventDraft } from "@/hooks/eventimist/organizer/Ai/useoOrganizerAiAction";
+
+
+import { useOrganizerSubscription } from "@/store/eventimist/organizer/auth/AuthState";
 
 export interface AIGeneratedEvent {
   title?: string;
@@ -33,16 +37,77 @@ const LOADING_MESSAGES = [
 ];
 
 const SUGGESTIONS = [
-  { icon: "🎵", label: "Music festival in Goa",       text: "A free 2-day music festival in Goa this December, outdoor, 1000 attendees, indie and electronic acts" },
-  { icon: "💻", label: "AI developer workshop",        text: "A 3-hour AI workshop for developers in Bangalore on 10 September, free, max 80 attendees, online" },
-  { icon: "🔗", label: "Startup networking dinner",   text: "Networking dinner for startup founders in Mumbai next Friday evening, 50 people, rooftop venue, free" },
-  { icon: "🍜", label: "Street food fair",             text: "A weekend food fair in Pune celebrating street food culture, free entry, 500 attendees, offline" },
-  { icon: "🎨", label: "Art & design conference",      text: "A 1-day art and design conference in Hyderabad, 200 attendees, hybrid format, free entry" },
-  { icon: "🏋️", label: "Fitness & wellness workshop", text: "A morning wellness and yoga workshop in Bangalore, 60 attendees, outdoor, free, this Sunday" },
-  { icon: "🎤", label: "Open mic night",               text: "An open mic comedy and spoken word night in Delhi, 100 attendees, indoor, free, next Saturday" },
-  { icon: "🎮", label: "Gaming tournament",            text: "A 2-day gaming tournament in Chennai, 150 participants, offline, free to enter, focus on indie games" },
-];
+  {
+    icon: "🎵",
+    label: "Sunset beach music festival",
+    text:
+      "Create a vibrant 2-day beachside music festival in Goa during December featuring indie bands, electronic DJs, live art installations, food stalls, and sunset performances. The event should target young adults and tourists, support around 1500 attendees, include VIP passes, and have a relaxed tropical vibe."
+  },
 
+  {
+    icon: "💻",
+    label: "AI developer bootcamp",
+    text:
+      "Generate a professional AI and machine learning bootcamp for software developers in Bangalore focused on building real-world generative AI applications using LLMs and vector databases. The workshop should be beginner-friendly, 4 hours long, include networking sessions, certificates, and accommodate 120 attendees."
+  },
+
+  {
+    icon: "🚀",
+    label: "Startup founders networking night",
+    text:
+      "Create an exclusive startup networking evening in Mumbai for founders, angel investors, and early-stage entrepreneurs. The event should include founder pitch sessions, investor networking tables, cocktails, rooftop ambience, curated discussions about fundraising and AI startups, with around 80 attendees."
+  },
+
+  {
+    icon: "🍜",
+    label: "Street food carnival",
+    text:
+      "Design a lively outdoor street food carnival in Pune celebrating Indian regional street cuisine with food trucks, live music, family activities, and local chefs. The event should support over 1000 visitors across the weekend and create a colorful festive atmosphere suitable for families and young adults."
+  },
+
+  {
+    icon: "🎨",
+    label: "Creative design summit",
+    text:
+      "Generate a modern art and design conference in Hyderabad bringing together UI/UX designers, digital artists, architects, and creative professionals. Include keynote talks, portfolio reviews, networking lounges, interactive workshops, and exhibition booths for around 300 attendees in a hybrid format."
+  },
+
+  {
+    icon: "🏋️",
+    label: "Wellness & mindfulness retreat",
+    text:
+      "Create a peaceful Sunday morning wellness retreat in Bangalore featuring yoga sessions, guided meditation, healthy food stalls, breathing workshops, and live acoustic music in an outdoor eco-friendly venue. The event should target working professionals and wellness enthusiasts with around 100 attendees."
+  },
+
+  {
+    icon: "🎤",
+    label: "Comedy & open mic night",
+    text:
+      "Generate an energetic open mic and stand-up comedy night in Delhi featuring emerging comedians, spoken word artists, and live audience interactions. The event should have a cozy indoor café atmosphere, free entry, evening timing, and capacity for around 120 attendees."
+  },
+
+  {
+    icon: "🎮",
+    label: "Indie gaming championship",
+    text:
+      "Create a 2-day gaming and esports tournament in Chennai focused on indie games and competitive multiplayer experiences. Include gaming booths, cosplay contests, creator meetups, livestream setups, sponsor stalls, and prize pools for students and gaming enthusiasts with around 250 participants."
+  },
+
+  {
+    icon: "📚",
+    label: "Book & literature festival",
+    text:
+      "Design a weekend literature and storytelling festival in Jaipur featuring bestselling authors, poetry sessions, book signings, panel discussions, reading lounges, and workshops for aspiring writers. The event should create a warm intellectual atmosphere and attract around 600 attendees."
+  },
+
+  {
+    icon: "🌱",
+    label: "Sustainability innovation expo",
+    text:
+      "Generate a sustainability and green technology expo in Bengaluru showcasing eco-friendly startups, climate-tech products, recycling innovations, and renewable energy solutions. Include startup demo booths, expert talks, investor networking, and workshops for students and professionals with approximately 400 attendees."
+  }
+];
+ 
 function isPresent(v: string | null | undefined): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
@@ -322,7 +387,8 @@ export function AIGenerateButton({ dark, onApply }: Props) {
   const [result,  setResult]  = useState<AIGeneratedEvent | null>(null);
   const [applied, setApplied] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
-  const [credits, setCredits] = useState(10); // demo: 10 credits
+  const subscription = useOrganizerSubscription();
+const credits = subscription?.aiCreditsRemaining ?? 10;
 
   const { generateEventDraft } = useOrganizerAiAction();
   const loading = generateEventDraft.loading;
@@ -352,7 +418,7 @@ export function AIGenerateButton({ dark, onApply }: Props) {
       setLoadingMsg(LOADING_MESSAGES[idx]);
     }, 600);
 
-    const raw: GenerateEventDraftResponse | null = await generateEventDraft.submit(prompt);
+   const raw: EventDraft | null = await generateEventDraft.submit(prompt);
 
     if (intervalRef.current) clearInterval(intervalRef.current);
 
@@ -371,7 +437,7 @@ export function AIGenerateButton({ dark, onApply }: Props) {
       mapped.tags = raw.tags.filter(t => isPresent(t));
 
     setResult(mapped);
-    setCredits(c => Math.max(0, c - 1));
+   
   };
 
   const handleApply = () => {
@@ -400,8 +466,8 @@ export function AIGenerateButton({ dark, onApply }: Props) {
         onClick={() => setOpen(true)}
         className="fixed bottom-5 right-5 sm:bottom-7 sm:right-7 z-50 flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 active:scale-95"
         style={{
-          background: "linear-gradient(135deg,#1c1917,#292524)",
-          color: "#fbbf24",
+          background: "linear-gradient(to left, #fbbf24, #f97316)",
+          color: "white",
           boxShadow: "0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(251,191,36,0.15)",
           fontFamily: "'DM Sans',sans-serif",
         }}
@@ -410,7 +476,7 @@ export function AIGenerateButton({ dark, onApply }: Props) {
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-60" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
         </span>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="3"/>
           <line x1="8" y1="2" x2="8" y2="6"/>
           <line x1="16" y1="2" x2="16" y2="6"/>
@@ -540,7 +606,7 @@ export function AIGenerateButton({ dark, onApply }: Props) {
                   ? "No credits left — upgrade to Pro"
                   : credits <= 3
                   ? `Only ${credits} generation${credits === 1 ? "" : "s"} left`
-                  : "Demo plan · 10 credits total"}
+                  : "Free plan · 10 credits total"}
               </span>
             </div>
 
