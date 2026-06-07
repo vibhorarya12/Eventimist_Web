@@ -203,7 +203,7 @@ function ComingSoonHero({ tk, dark }: { tk: typeof LIGHT; dark: boolean }) {
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
               style={{ background:tk.goldBg, border:`1.5px solid ${tk.goldBdr}` }}>
               <span className="w-1.5 h-1.5 rounded-full pulse-green" style={{ background:tk.gold }}/>
-              <span className="text-[9px] font-black tracking-[0.25em] uppercase"
+              <span className="text-[20px] font-black tracking-[0.25em] uppercase"
                 style={{ color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif" }}>
                 Coming Soon
               </span>
@@ -269,7 +269,7 @@ function ComingSoonHero({ tk, dark }: { tk: typeof LIGHT; dark: boolean }) {
                 style={{ border:`1.5px solid ${tk.border}`, background:tk.surface, boxShadow:`0 12px 48px ${tk.shadow}` }}>
                 {/* Card header */}
                 <div className="px-6 py-5" style={{ borderBottom:`1.5px solid ${tk.border}`, background:tk.bgAlt }}>
-                  <div style={{ fontSize:9, fontWeight:900, letterSpacing:"0.25em", textTransform:"uppercase", color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif", marginBottom:4 }}>
+                  <div style={{ fontSize:18, fontWeight:900, letterSpacing:"0.25em", textTransform:"uppercase", color:tk.gold, fontFamily:"'Barlow Condensed',sans-serif", marginBottom:4 }}>
                     Get early access
                   </div>
                   <p style={{ fontSize:13, color:tk.ink2, fontFamily:"'Libre Baskerville',serif", margin:0, lineHeight:1.6 }}>
@@ -507,7 +507,7 @@ export default function EventixPage() {
         </div>
 
         {/* ── 3. Org marquee ── */}
-        <div style={{ background:tk.ink, overflow:"hidden", padding:"11px 0", borderTop:`1.5px solid ${tk.border}` }}>
+        {/* <div style={{ background:tk.ink, overflow:"hidden", padding:"11px 0", borderTop:`1.5px solid ${tk.border}` }}>
           <div className="marquee-ltr" style={{ display:"flex", gap:0 }}>
             {[...ORGS,...ORGS,...ORGS].map((o,i) => (
               <div key={i} style={{ display:"flex", alignItems:"center", gap:8, padding:"0 24px", flexShrink:0 }}>
@@ -518,7 +518,7 @@ export default function EventixPage() {
               </div>
             ))}
           </div>
-        </div>
+        </div> */}
 
         {/* ── 4. Features (dimmed teaser) ── */}
         <Features tk={tk} dark={dark}/>
