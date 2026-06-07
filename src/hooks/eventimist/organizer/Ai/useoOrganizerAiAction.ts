@@ -6,13 +6,12 @@ import { useMutation } from "@tanstack/react-query";
 
 import {
   generateEventDraft,
+  sendAiChat,
   type GenerateEventDraftResponse,
-  type AIServiceError,
+  type AiChatResponse,
 } from "@/services/eventimist/organizer/AiService/organizerAiActions.service";
 
-import {
-  useOrganizerAuth,
-} from "@/store/eventimist/organizer/auth/AuthState";
+import { useOrganizerAuth } from "@/store/eventimist/organizer/auth/AuthState";
 
 // ─── Flat draft shape consumed by the UI ─────────────────────────────────────
 export interface EventDraft {
@@ -34,30 +33,35 @@ export interface UseOrganizerAiActionReturn {
     error: string | null;
     reset: () => void;
   };
+  aiChat: {
+    submit: (prompt: string) => Promise<AiChatResponse | null>;
+    loading: boolean;
+    error: string | null;
+    reset: () => void;
+  };
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useOrganizerAiAction(): UseOrganizerAiActionReturn {
-  const setSubscription     = useOrganizerAuth((s) => s.setSubscription);
+  const setSubscription       = useOrganizerAuth((s) => s.setSubscription);
   const setSubscriptionLoaded = useOrganizerAuth((s) => s.setSubscriptionLoaded);
 
+  // ─── Generate Event Draft mutation ────────────────────────────────────────
   const {
     mutateAsync: mutateGenerateDraft,
     isPending:   generateLoading,
     error:       generateError,
-    reset:       mutationReset,
+    reset:       resetGenerateDraft,
   } = useMutation({
-    mutationFn: async ({ prompt }: { prompt: string }): Promise<GenerateEventDraftResponse> => {
-      return generateEventDraft(prompt);
-    },
+    mutationFn: ({ prompt }: { prompt: string }): Promise<GenerateEventDraftResponse> =>
+      generateEventDraft(prompt),
   });
 
-  // ─── Submit ───────────────────────────────────────────────────────────────
   const generateSubmit = async (prompt: string): Promise<EventDraft | null> => {
     try {
       const data = await mutateGenerateDraft({ prompt });
 
-      // ── Persist updated subscription to store every time ──────────────────
+      // Persist latest subscription to store
       if (data.subscription) {
         setSubscription({
           plan:               data.subscription.planType as "FREE" | "PRO",
@@ -70,8 +74,26 @@ export function useOrganizerAiAction(): UseOrganizerAiActionReturn {
         setSubscriptionLoaded(true);
       }
 
-      // Return only the draft portion to the UI
       return data.draft;
+    } catch {
+      return null;
+    }
+  };
+
+  // ─── AI Chat mutation ─────────────────────────────────────────────────────
+  const {
+    mutateAsync: mutateChatDraft,
+    isPending:   chatLoading,
+    error:       chatError,
+    reset:       resetChat,
+  } = useMutation({
+    mutationFn: ({ prompt }: { prompt: string }): Promise<AiChatResponse> =>
+      sendAiChat(prompt),
+  });
+
+  const chatSubmit = async (prompt: string): Promise<AiChatResponse | null> => {
+    try {
+      return await mutateChatDraft({ prompt });
     } catch {
       return null;
     }
@@ -82,10 +104,17 @@ export function useOrganizerAiAction(): UseOrganizerAiActionReturn {
       submit:  generateSubmit,
       loading: generateLoading,
       error:   generateError
-        ? (generateError as any)?.response?.data?.message ||
-          (generateError as Error).message
+        ? (generateError as any)?.response?.data?.message || (generateError as Error).message
         : null,
-      reset: mutationReset,
+      reset: resetGenerateDraft,
+    },
+    aiChat: {
+      submit:  chatSubmit,
+      loading: chatLoading,
+      error:   chatError
+        ? (chatError as any)?.response?.data?.message || (chatError as Error).message
+        : null,
+      reset: resetChat,
     },
   };
 }

@@ -2,12 +2,7 @@
 
 import eventimistClient from "@/services/eventimist/client";
 
-// ─── Request Types ────────────────────────────────────────────────────────────
-export interface GenerateEventDraftRequest {
-  prompt: string;
-}
-
-// ─── Response Types ───────────────────────────────────────────────────────────
+// ─── Generate Event Draft ─────────────────────────────────────────────────────
 export interface GenerateEventDraftResponse {
   draft: {
     title: string | null;
@@ -28,19 +23,58 @@ export interface GenerateEventDraftResponse {
   };
 }
 
-// ─── Error Types ──────────────────────────────────────────────────────────────
+export async function generateEventDraft(
+  prompt: string
+): Promise<GenerateEventDraftResponse> {
+  const res = await eventimistClient.post<GenerateEventDraftResponse>(
+    "/organizer/generate-event-draft",
+    { prompt }
+  );
+  return res.data;
+}
+
+// ─── AI Chat ──────────────────────────────────────────────────────────────────
+export type AiChatType =
+  | "DRAFT_EVENTS"
+  | "PUBLISHED_EVENTS"
+  | "SUBSCRIPTION_INFO"
+  | "GENERAL_CHAT"
+  | "UNKNOWN"
+  | "ERROR";
+
+export interface AiChatEventItem {
+  id: number;
+  title: string;
+  slug: string;
+  coverImage: string | null;
+  status: string;
+}
+
+export interface AiChatSubscriptionData {
+  planType: string;
+  aiCreditsRemaining: number;
+  monthlyAiCredits: number;
+  promptCharacterLimit: number;
+  active: boolean;
+}
+
+export interface AiChatResponse {
+  message: string;
+  type: AiChatType;
+  data: AiChatEventItem[] | AiChatSubscriptionData | null;
+}
+
 export interface AIServiceError {
   statusCode: number;
   message: string;
   timestamp: string;
 }
 
-// ─── API Functions ────────────────────────────────────────────────────────────
-export async function generateEventDraft(
+export async function sendAiChat(
   prompt: string
-): Promise<GenerateEventDraftResponse> {
-  const res = await eventimistClient.post<GenerateEventDraftResponse>(
-    "/organizer/generate-event-draft",
+): Promise<AiChatResponse> {
+  const res = await eventimistClient.post<AiChatResponse>(
+    "/organizer/ai-chat",
     { prompt }
   );
   return res.data;
