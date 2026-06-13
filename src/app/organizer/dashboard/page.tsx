@@ -649,62 +649,434 @@ function TabAnalytics({ dark }: { dark: boolean }) {
 }
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
-function TabSettings({ dark, onToggleDark }: { dark: boolean; onToggleDark: () => void }) {
-  const name       = useOrganizerAuth((s) => s.name);
-  const email      = useOrganizerAuth((s) => s.email);
-  const bio        = useOrganizerAuth((s) => s.bio);
-  const location   = useOrganizerAuth((s) => s.location);
-  const profilePic = useOrganizerAuth((s) => s.profilePic);
+
+// ─── Drop-in replacement for TabSettings in dashboard/page.tsx ────────────────
+// Replace the existing TabSettings function entirely with this one.
+// Props: { dark, onToggleDark, onOpenAssistant? }
+
+
+
+function TabSettings({
+  dark,
+  onToggleDark,
+  onOpenAssistant,
+}: {
+  dark: boolean;
+  onToggleDark: () => void;
+  onOpenAssistant?: () => void;
+}) {
+  const name        = useOrganizerAuth((s) => s.name);
+  const email       = useOrganizerAuth((s) => s.email);
+  const bio         = useOrganizerAuth((s) => s.bio);
+  const location    = useOrganizerAuth((s) => s.location);
+  const profilePic  = useOrganizerAuth((s) => s.profilePic);
+  const subscription = useOrganizerSubscription();
+  const { logout }  = useOrganizerLogout();
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // ── Palette ──────────────────────────────────────────────────────────────────
+  const surface   = d(dark, "#13151f", "#ffffff");
+  const surface2  = d(dark, "#1a1d2e", "#f5f5f4");
+  const border    = d(dark, "rgba(255,255,255,0.07)", "#e7e5e4");
+  const text1     = d(dark, "#ffffff", "#1c1917");
+  const text2     = d(dark, "rgba(255,255,255,0.6)", "#57534e");
+  const text3     = d(dark, "rgba(255,255,255,0.3)", "#a8a29e");
+
+  const plan      = subscription?.plan ?? "FREE";
+  const remaining = subscription?.aiCreditsRemaining ?? 0;
+  const total     = subscription?.aiCreditsTotal ?? 10;
+  const active    = subscription?.canUseAI ?? false;
+  const limit     = (subscription as any)?.promptCharacterLimit ?? 300;
+  const isPro     = plan === "PRO";
+  const pct       = total > 0 ? Math.round((remaining / total) * 100) : 0;
+  const credColor = remaining === 0 ? "#ef4444" : remaining <= 3 ? "#f59e0b" : "#fbbf24";
+
+  // ── Section wrapper ───────────────────────────────────────────────────────────
+  const Section = ({
+    title, icon, children,
+  }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
+    <div className="rounded-2xl overflow-hidden"
+      style={{ background: surface, border: `1px solid ${border}` }}>
+      <div className="flex items-center gap-3 px-5 py-4"
+        style={{ borderBottom: `1px solid ${border}` }}>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+          style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)" }}>
+          <span style={{ color: "#fbbf24" }}>{icon}</span>
+        </div>
+        <h3 className="text-sm font-black" style={{ color: text1, fontFamily: "'DM Serif Display',Georgia,serif" }}>
+          {title}
+        </h3>
+      </div>
+      <div className="px-5 py-5">{children}</div>
+    </div>
+  );
+
+  // ── Row (label + right content) ───────────────────────────────────────────────
+  const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div className="flex items-center justify-between py-3.5"
+      style={{ borderBottom: `1px solid ${border}` }}>
+      <span className="text-xs font-semibold" style={{ color: text3 }}>{label}</span>
+      <div className="flex items-center gap-2">{children}</div>
+    </div>
+  );
+
   return (
     <div className="space-y-5 max-w-2xl">
-      <h2 className={`${T.text1(dark)} font-black text-lg sm:text-xl`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>Settings</h2>
-      {/* Profile card */}
-      <div className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl overflow-hidden`}>
-        <div className={`px-4 sm:px-5 py-4 border-b ${T.border(dark)}`}><h3 className={`${T.text1(dark)} font-black text-sm`}>Profile Information</h3></div>
-        <div className="p-4 sm:p-5 space-y-4">
-          <div className="flex items-center gap-4">
-            {profilePic ? <img src={profilePic} alt={name??""} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-amber-400/30"/> :
-              <div className="w-16 h-16 rounded-2xl bg-amber-400/15 ring-2 ring-amber-400/25 flex items-center justify-center text-amber-500 font-black text-2xl" style={{fontFamily:"'Playfair Display',Georgia,serif"}}>{name?.charAt(0)??'O'}</div>}
-            <div>
-              <div className={`${T.text1(dark)} font-bold text-sm`}>{name??'Organizer'}</div>
-              <div className={`${T.text3(dark)} text-xs`}>{email??''}</div>
-              {location&&<div className={`${T.text3(dark)} text-[10px] mt-1 flex items-center gap-1`}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>{location}</div>}
-            </div>
-          </div>
-          {bio&&<div className={`${T.text3(dark)} text-xs leading-relaxed p-3 ${d(dark,"bg-white/4","bg-gray-50")} rounded-xl`}>{bio}</div>}
-        </div>
+
+      {/* Page heading */}
+      <div className="mb-2">
+        <p className="text-[10px] font-black tracking-widest uppercase mb-1" style={{ color: "#f59e0b" }}>
+          Account
+        </p>
+        <h2 className="text-2xl font-black" style={{ fontFamily: "'DM Serif Display',Georgia,serif", color: text1 }}>
+          Settings
+        </h2>
       </div>
-      {/* Appearance */}
-      <div className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl overflow-hidden`}>
-        <div className={`px-4 sm:px-5 py-4 border-b ${T.border(dark)}`}><h3 className={`${T.text1(dark)} font-black text-sm`}>Appearance</h3></div>
-        <div className="p-4 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className={`${T.text2(dark)} text-sm font-semibold`}>Dark Mode</div>
-              <div className={`${T.text3(dark)} text-[11px] mt-0.5`}>Toggle between light and dark theme</div>
-            </div>
-            <DarkToggle dark={dark} onToggle={onToggleDark}/>
+
+      {/* ── 1. Profile ── */}
+      <Section title="Profile" icon={
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+      }>
+        {/* Avatar + name row */}
+        <div className="flex items-center gap-4 mb-5 pb-5" style={{ borderBottom: `1px solid ${border}` }}>
+          <div className="relative flex-shrink-0">
+            {profilePic
+              ? <img src={profilePic} alt={name ?? ""} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-amber-400/20"/>
+              : <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-amber-400 font-black text-2xl ring-2 ring-amber-400/20"
+                  style={{ background: "rgba(251,191,36,0.08)", fontFamily: "'DM Serif Display',serif" }}>
+                  {name?.charAt(0) ?? "O"}
+                </div>
+            }
+            {/* Online dot */}
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 bg-emerald-500"
+              style={{ borderColor: surface }}/>
           </div>
-        </div>
-      </div>
-      {/* Notifications */}
-      <div className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl overflow-hidden`}>
-        <div className={`px-4 sm:px-5 py-4 border-b ${T.border(dark)}`}><h3 className={`${T.text1(dark)} font-black text-sm`}>Notifications</h3></div>
-        <div className={`divide-y ${d(dark,"divide-white/5","divide-gray-100")}`}>
-          {[{label:"New RSVPs",desc:"Get notified when someone RSVPs to your events",on:true},{label:"Cancellations",desc:"Alert when attendees cancel their registration",on:true},{label:"Payouts",desc:"Notification when your payout is processed",on:true},{label:"Event reminders",desc:"Reminders before your events go live",on:false}].map(item=>(
-            <div key={item.label} className="flex items-center justify-between px-4 sm:px-5 py-4">
-              <div><div className={`${T.text2(dark)} text-xs sm:text-sm font-semibold`}>{item.label}</div><div className={`${T.text3(dark)} text-[10px] sm:text-[11px] mt-0.5`}>{item.desc}</div></div>
-              <div className={`relative w-10 h-5 rounded-full transition-all duration-300 flex-shrink-0 ${item.on?"bg-amber-400":"bg-gray-300"}`}>
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-300 ${item.on?"translate-x-5":"translate-x-0.5"}`}/>
+          <div className="min-w-0">
+            <p className="font-black text-base leading-tight truncate" style={{ color: text1, fontFamily: "'DM Serif Display',serif" }}>
+              {name ?? "Organizer"}
+            </p>
+            <p className="text-xs mt-0.5 truncate" style={{ color: text3 }}>{email ?? ""}</p>
+            {location && (
+              <div className="flex items-center gap-1 mt-1">
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" style={{ color: text3 }}>
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                <span className="text-[11px] truncate" style={{ color: text3 }}>{location}</span>
               </div>
-            </div>
-          ))}
+            )}
+          </div>
+          <div className="ml-auto flex-shrink-0">
+            <span className="text-[9px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full"
+              style={{ background: surface2, border: `1px solid ${border}`, color: text3 }}>
+              Read-only
+            </span>
+          </div>
         </div>
-      </div>
+
+        {bio && (
+          <div className="rounded-xl px-4 py-3" style={{ background: surface2, border: `1px solid ${border}` }}>
+            <p className="text-[10px] font-black tracking-widest uppercase mb-1.5" style={{ color: text3 }}>Bio</p>
+            <p className="text-xs leading-relaxed" style={{ color: text2 }}>{bio}</p>
+          </div>
+        )}
+
+        <p className="text-[10px] mt-4" style={{ color: text3 }}>
+          Profile editing is coming in a future update. Contact support to update your details.
+        </p>
+      </Section>
+
+      {/* ── 2. Subscription ── */}
+      <Section title="Subscription" icon={
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      }>
+        {/* Plan badge */}
+        <div className="flex items-center justify-between mb-5 pb-5" style={{ borderBottom: `1px solid ${border}` }}>
+          <div>
+            <p className="text-[10px] font-black tracking-widest uppercase mb-1" style={{ color: text3 }}>Current Plan</p>
+            <div className="flex items-center gap-2">
+              {isPro && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#fbbf24">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              )}
+              <span className="text-xl font-black" style={{ fontFamily: "'DM Serif Display',serif", color: isPro ? "#fbbf24" : text1 }}>
+                {plan}
+              </span>
+              <span className="text-[9px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full"
+                style={{ background: active ? "rgba(52,211,153,0.1)" : "rgba(239,68,68,0.1)", color: active ? "#34d399" : "#ef4444", border: `1px solid ${active ? "rgba(52,211,153,0.2)" : "rgba(239,68,68,0.2)"}` }}>
+                {active ? "Active" : "Inactive"}
+              </span>
+            </div>
+          </div>
+          {!isPro && (
+            <a href="/organizer/subscriptions"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black text-stone-900 transition-all hover:opacity-90"
+              style={{ background: "linear-gradient(135deg,#f59e0b,#fbbf24)" }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              Upgrade to Pro
+            </a>
+          )}
+        </div>
+
+        {/* AI credits */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black tracking-widest uppercase" style={{ color: text3 }}>
+              AI Credits this month
+            </p>
+            <span className="text-xs font-black" style={{ color: credColor }}>
+              {remaining} / {total} remaining
+            </span>
+          </div>
+          <div className="h-2 rounded-full overflow-hidden" style={{ background: surface2 }}>
+            <div className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${pct}%`,
+                background: remaining === 0 ? "#ef4444"
+                  : remaining <= 3 ? "linear-gradient(90deg,#f59e0b,#fbbf24)"
+                  : "linear-gradient(90deg,#f59e0b,#fbbf24)",
+              }}/>
+          </div>
+          {remaining === 0 && (
+            <p className="text-[10px] mt-1.5 text-red-400">Credits exhausted — resets on the 1st of next month</p>
+          )}
+        </div>
+
+        {/* Stat rows */}
+        <div style={{ borderTop: `1px solid ${border}` }}>
+          <Row label="Monthly credits total">
+            <span className="text-xs font-black" style={{ color: text1 }}>{total}</span>
+          </Row>
+          <Row label="Prompt character limit">
+            <span className="text-xs font-black" style={{ color: text1 }}>{limit} chars</span>
+          </Row>
+          <Row label="Credits reset">
+            <span className="text-xs font-semibold" style={{ color: text2 }}>1st of every month</span>
+          </Row>
+          <div className="flex items-center justify-between pt-3.5">
+            <span className="text-xs font-semibold" style={{ color: text3 }}>View full plan details</span>
+            <a href="/organizer/subscriptions"
+              className="text-xs font-black flex items-center gap-1 transition-colors"
+              style={{ color: "#fbbf24" }}>
+              Manage subscription
+              <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6"/>
+              </svg>
+            </a>
+          </div>
+        </div>
+      </Section>
+
+      {/* ── 3. Appearance ── */}
+      <Section title="Appearance" icon={
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      }>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold" style={{ color: text1 }}>Dark mode</p>
+            <p className="text-[11px] mt-0.5" style={{ color: text3 }}>
+              {dark ? "Currently using dark theme" : "Currently using light theme"}
+            </p>
+          </div>
+          {/* Toggle */}
+          <button onClick={onToggleDark}
+            className="relative flex-shrink-0 transition-all duration-300"
+            style={{
+              width: 48, height: 26, borderRadius: 99,
+              background: dark ? "rgba(251,191,36,0.15)" : surface2,
+              border: `1.5px solid ${dark ? "rgba(251,191,36,0.3)" : border}`,
+            }}>
+            <span className="absolute text-[10px]" style={{ left: 7, top: "50%", transform: "translateY(-50%)", opacity: dark ? 1 : 0, transition: "opacity .2s" }}>🌙</span>
+            <span className="absolute text-[10px]" style={{ right: 7, top: "50%", transform: "translateY(-50%)", opacity: dark ? 0 : 1, transition: "opacity .2s" }}>☀️</span>
+            <div className="absolute top-0.5 w-5 h-5 rounded-full shadow transition-all duration-300"
+              style={{
+                transform: dark ? "translateX(24px)" : "translateX(2px)",
+                background: dark ? "#fbbf24" : "#fff",
+              }}/>
+          </button>
+        </div>
+      </Section>
+
+      {/* ── 4. AI Assistant ── */}
+      <Section title="AI Assistant" icon={
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="7" y="7" width="10" height="10" rx="2"/>
+          <line x1="7" y1="9.5" x2="4" y2="9.5"/><line x1="7" y1="12" x2="4" y2="12"/><line x1="7" y1="14.5" x2="4" y2="14.5"/>
+          <line x1="17" y1="9.5" x2="20" y2="9.5"/><line x1="17" y1="12" x2="20" y2="12"/><line x1="17" y1="14.5" x2="20" y2="14.5"/>
+        </svg>
+      }>
+        <div className="flex items-start gap-4">
+          {/* Credit orb */}
+          <div className="flex-shrink-0 w-16 h-16 rounded-2xl flex flex-col items-center justify-center"
+            style={{ background: "rgba(251,191,36,0.06)", border: `1.5px solid rgba(251,191,36,0.2)` }}>
+            <span className="text-xl font-black leading-none" style={{ color: credColor, fontFamily: "'DM Serif Display',serif" }}>
+              {remaining}
+            </span>
+            <span className="text-[8px] font-black tracking-widest uppercase mt-0.5" style={{ color: "rgba(251,191,36,0.5)" }}>
+              CREDITS
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold mb-1" style={{ color: text1 }}>
+              AI-powered event tools
+            </p>
+            <p className="text-xs leading-relaxed mb-4" style={{ color: text2 }}>
+              Generate event titles, descriptions, tags, and dates from a plain-English prompt. Your AI assistant can also list events, check your credits, and answer questions about your account.
+            </p>
+            <div className="flex items-center gap-2">
+              {onOpenAssistant && (
+                <button onClick={onOpenAssistant}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all hover:opacity-90"
+                  style={{ background: "linear-gradient(135deg,#1c1917,#292524)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.2)" }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                  </svg>
+                  Open Assistant
+                </button>
+              )}
+              <a href="/organizer/subscriptions"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-colors"
+                style={{ background: surface2, border: `1px solid ${border}`, color: text3 }}>
+                {remaining === 0 ? "Get more credits →" : "View usage →"}
+              </a>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* ── 5. Account ── */}
+      <Section title="Account" icon={
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      }>
+        <div className="space-y-3">
+          {/* Logout */}
+          <div className="flex items-center justify-between py-3"
+            style={{ borderBottom: `1px solid ${border}` }}>
+            <div>
+              <p className="text-sm font-bold" style={{ color: text1 }}>Sign out</p>
+              <p className="text-[11px] mt-0.5" style={{ color: text3 }}>
+                Sign out of your organizer account on this device
+              </p>
+            </div>
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all hover:bg-rose-500 hover:text-white"
+              style={{
+                background: "rgba(239,68,68,0.08)",
+                border: "1px solid rgba(239,68,68,0.2)",
+                color: "#ef4444",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Sign out
+            </button>
+          </div>
+
+          {/* Delete account */}
+          <div className="flex items-center justify-between py-3">
+            <div>
+              <p className="text-sm font-bold text-red-500">Delete account</p>
+              <p className="text-[11px] mt-0.5" style={{ color: text3 }}>
+                Permanently delete your account and all event data
+              </p>
+            </div>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-colors"
+              style={{
+                background: surface2,
+                border: `1px solid ${border}`,
+                color: text3,
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.08)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(239,68,68,0.2)";
+                (e.currentTarget as HTMLButtonElement).style.color = "#ef4444";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = surface2;
+                (e.currentTarget as HTMLButtonElement).style.borderColor = border;
+                (e.currentTarget as HTMLButtonElement).style.color = text3;
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+              </svg>
+              Delete
+            </button>
+          </div>
+        </div>
+      </Section>
+
+      {/* ── Delete account confirmation modal ── */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)" }}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl"
+            style={{ background: surface, border: `1px solid ${border}` }}>
+            {/* Header */}
+            <div className="px-6 pt-6 pb-5 text-center">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                  <path d="M10 11v6"/><path d="M14 11v6"/>
+                </svg>
+              </div>
+              <h3 className="text-lg font-black mb-2"
+                style={{ fontFamily: "'DM Serif Display',serif", color: text1 }}>
+                Delete your account?
+              </h3>
+              <p className="text-sm leading-relaxed" style={{ color: text2 }}>
+                This will permanently delete your account, all events, and event data. This action cannot be undone.
+              </p>
+            </div>
+
+            {/* Warning */}
+            <div className="mx-6 mb-5 px-4 py-3 rounded-xl"
+              style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+              <p className="text-[11px] text-red-400 leading-relaxed">
+                ⚠ All published events, RSVPs, and organizer data will be lost permanently.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-6 flex gap-3">
+              <button onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-3 rounded-xl text-sm font-bold transition-colors"
+                style={{ background: surface2, border: `1px solid ${border}`, color: text2 }}>
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  // TODO: call delete account API
+                }}
+                className="flex-1 py-3 rounded-xl text-sm font-black text-white transition-all hover:opacity-90"
+                style={{ background: "linear-gradient(135deg,#dc2626,#ef4444)" }}>
+                Delete account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
 // ─── Publish Modal ────────────────────────────────────────────────────────────
 function PublishModal({ eventId, rawEvents, dark, onClose }: {
   eventId: string;
@@ -1062,7 +1434,7 @@ export default function OrganizerDashboard() {
       </nav>
 
       {/* Profile strip */}
-      <div className={`px-4 py-4 border-t ${T.border(dark)} mt-auto`}>
+      {/* <div className={`px-4 py-4 border-t ${T.border(dark)} mt-auto`}>
         <div className="flex items-start gap-3 mb-3">
           <div className="relative flex-shrink-0">
             {profilePic ? <img src={profilePic} alt={name??""} className="w-9 h-9 rounded-full object-cover ring-2 ring-amber-400/30"/> :
@@ -1083,7 +1455,7 @@ export default function OrganizerDashboard() {
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Sign out
         </button>
-      </div>
+      </div> */}
     </div>
   );
 
