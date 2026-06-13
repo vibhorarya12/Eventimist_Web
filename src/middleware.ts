@@ -6,6 +6,7 @@ const ORGANIZER_PROTECTED = [
   "/organizer/create-event",
   "/organizer/update-event",
   "/organizer/preview-event",
+  "/organizer/subscriptions"
 ];
 const ORGANIZER_AUTH_ROUTES = ["/organizer/auth"];
 const ORGANIZER_PASSTHROUGH = ["/organizer/auth/oauth-callback", "/oauth-confirm"];
