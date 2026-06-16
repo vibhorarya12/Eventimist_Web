@@ -242,10 +242,12 @@ function DiscoverPageInner() {
   const [query,       setQuery]       = useState("");
   const [activeType,  setActiveType]  = useState("All");
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
-  const [view,        setView]        = useState<"split"|"list"|"map">("split");
+  const [view, setView] = useState<"split"|"list"|"map">(
+  typeof window !== "undefined" && window.innerWidth < 640 ? "list" : "split");
   const [mapReady,    setMapReady]    = useState(false);
   const [sortBy,      setSortBy]      = useState<"date"|"attendance">("date");
-
+  
+  const sentinelRef = useRef<HTMLDivElement>(null);
   // ── Real events from API ────────────────────────────────────────────────────
   const {
     events:         rawEvents,
@@ -257,6 +259,10 @@ function DiscoverPageInner() {
     coords,
     radius,
     setRadius,
+    hasMore,        // ← add
+  loadMore,       // ← add
+  loadingMore,    // ← add
+  totalEvents,    // ← add
   } = useDiscoverEvents(10);
 
   // Map API events → EventCard shape
@@ -363,6 +369,28 @@ function DiscoverPageInner() {
     const t = setTimeout(() => (window as any).google?.maps?.event?.trigger(mapObjRef.current, "resize"), 50);
     return () => clearTimeout(t);
   }, [view, mapReady]);
+  
+
+ useEffect(() => {
+  if (!sentinelRef.current) return;
+  const observer = new IntersectionObserver(
+    entries => { if (entries[0].isIntersecting && hasMore && !loadingMore) loadMore(); },
+    { threshold: 0.1 }
+  );
+  observer.observe(sentinelRef.current);
+  return () => observer.disconnect();
+}, [hasMore, loadingMore, loadMore]);
+
+ 
+useEffect(() => {
+  const check = () => {
+    if (window.innerWidth < 640 && view === "split") setView("list");
+  };
+  check();
+  window.addEventListener("resize", check);
+  return () => window.removeEventListener("resize", check);
+}, [view]);
+
 
   const zoomIn   = useCallback(() => mapObjRef.current?.setZoom((mapObjRef.current.getZoom() ?? 12) + 1), []);
   const zoomOut  = useCallback(() => mapObjRef.current?.setZoom((mapObjRef.current.getZoom() ?? 12) - 1), []);
@@ -449,17 +477,17 @@ function DiscoverPageInner() {
                 </button>
 
                 {/* View toggle */}
-                <div className={`ml-auto flex items-center rounded-xl border overflow-hidden flex-shrink-0 ${dark?"border-white/10":"border-stone-200"}`}>
+               <div className={`ml-auto flex items-center rounded-xl border overflow-hidden flex-shrink-0 ${dark?"border-white/10":"border-stone-200"}`}>
                   {([
-                    { v:"split" as const, title:"Split",
+                    { v:"split" as const, title:"Split",hide:"hidden sm:flex",
                       icon:<><rect x="2" y="3" width="9" height="18" rx="1"/><rect x="13" y="3" width="9" height="18" rx="1"/></> },
                     { v:"list"  as const, title:"List",
                       icon:<><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></> },
                     { v:"map"   as const, title:"Map",
                       icon:<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></> },
-                  ]).map(({ v, icon, title }) => (
+                  ]).map(({ v, icon, title , hide}) => (
                     <button key={v} onClick={() => setView(v)} title={title}
-                      className={`w-9 h-8 flex items-center justify-center transition-all
+                      className={`${hide} w-9 h-8 flex items-center justify-center transition-all
                         ${view === v ? "bg-amber-500 text-white"
                           : dark ? "text-white/35 hover:text-white hover:bg-white/8"
                                  : "text-stone-400 hover:text-stone-700 hover:bg-stone-100"}`}>
@@ -546,7 +574,7 @@ function DiscoverPageInner() {
               <div className={`px-4 py-2 border-b ${bdr} flex items-center justify-between flex-shrink-0 transition-colors`}
                 style={{ background: bgSurf }}>
                 <span className={`text-xs font-bold ${t2}`}>
-                  {filtered.length} event{filtered.length !== 1 ? "s" : ""} near Delhi
+                {totalEvents > 0 ? `${filtered.length} of ${totalEvents}` : filtered.length} event{filtered.length !== 1 ? "s" : ""} nearby
                 </span>
                 <button onClick={() => setSortBy(s => s === "date" ? "attendance" : "date")}
                   className={`sm:hidden flex items-center gap-1 text-[11px] font-semibold transition-colors ${t3}`}>
@@ -599,8 +627,22 @@ function DiscoverPageInner() {
                   ))
                 )}
               </div>
-            </div>
 
+             {/* Infinite scroll sentinel */}
+                  <div ref={sentinelRef} className="py-2 flex justify-center">
+                    {loadingMore && (
+                      <svg className="w-5 h-5 animate-spin text-amber-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                    )}
+                    {/* {!hasMore && filtered.length > 0 && (
+                      <p className={`text-[10px] font-semibold ${t3}`}>All events loaded</p>
+                    )} */}
+                  </div>
+
+            </div>
+           
             {/* Map */}
             <div className={`relative overflow-hidden flex-shrink-0 transition-all duration-300 ${
               view === "list" ? "w-0 opacity-0 pointer-events-none" : "flex-1"
