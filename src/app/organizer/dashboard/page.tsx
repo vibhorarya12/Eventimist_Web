@@ -517,82 +517,351 @@ function TabDashboard({ dark, onPublish }: { dark: boolean; onPublish: (id: stri
 function TabAudience({ dark }: { dark: boolean }) {
   const { events: rawEvents } = useOrganizerEvents();
   const EVENTS = useMemo(() => rawEvents.map(mapEvent), [rawEvents]);
-  const totalRsvps = EVENTS.reduce((s,e)=>s+e.rsvps,0);
+
+  // ── Derived stats ──────────────────────────────────────────────────────────
+  const totalRsvps        = EVENTS.reduce((s, e) => s + e.rsvps, 0);
+  const upcomingAttendees = EVENTS.filter(e => e.status === "upcoming" || e.status === "live")
+                                  .reduce((s, e) => s + e.rsvps, 0);
+  const publishedEvents   = EVENTS.filter(e => e.status !== "draft").length;
+  const draftEvents       = EVENTS.filter(e => e.status === "draft").length;
+
+  // Bar chart data — top 8 by RSVP
+  const chartData = [...EVENTS]
+    .filter(e => e.rsvps > 0)
+    .sort((a, b) => b.rsvps - a.rsvps)
+    .slice(0, 8);
+  const maxRsvp = chartData[0]?.rsvps || 1;
+
+  // ── Stat card config ───────────────────────────────────────────────────────
+  const stats = [
+    {
+      label: "Total RSVPs",
+      value: totalRsvps.toLocaleString(),
+      sub: "across all events",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+          <path d="M16 3.13a4 4 0 010 7.75"/>
+        </svg>
+      ),
+      accent: "#f59e0b",
+      accentBg: dark ? "rgba(245,158,11,0.10)" : "rgba(245,158,11,0.08)",
+      accentBorder: dark ? "rgba(245,158,11,0.20)" : "rgba(245,158,11,0.25)",
+    },
+    {
+      label: "Upcoming Attendees",
+      value: upcomingAttendees.toLocaleString(),
+      sub: "live + upcoming events",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      ),
+      accent: "#34d399",
+      accentBg: dark ? "rgba(52,211,153,0.10)" : "rgba(52,211,153,0.08)",
+      accentBorder: dark ? "rgba(52,211,153,0.20)" : "rgba(52,211,153,0.25)",
+    },
+    {
+      label: "Published Events",
+      value: String(publishedEvents),
+      sub: "visible to attendees",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      ),
+      accent: "#60a5fa",
+      accentBg: dark ? "rgba(96,165,250,0.10)" : "rgba(96,165,250,0.08)",
+      accentBorder: dark ? "rgba(96,165,250,0.20)" : "rgba(96,165,250,0.25)",
+    },
+    {
+      label: "Draft Events",
+      value: String(draftEvents),
+      sub: "not yet published",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      ),
+      accent: dark ? "rgba(255,255,255,0.35)" : "#9ca3af",
+      accentBg: dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+      accentBorder: dark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)",
+    },
+  ];
+
   return (
-    <div className="space-y-5">
-      <h2 className={`${T.text1(dark)} font-black text-lg sm:text-xl`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>Audience</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        {[{label:"Total Audience",value:totalRsvps.toLocaleString(),sub:"across all events"},{label:"Return Rate",value:"73%",sub:"come back for more"},{label:"Avg. Rating",value:"4.8★",sub:"organizer rating"},{label:"Total Reach",value:"28.4K",sub:"unique attendees"}].map(s=>(
-          <div key={s.label} className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl p-4 text-center`}>
-            <div className={`${T.text1(dark)} font-black text-xl sm:text-2xl mb-1`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>{s.value}</div>
-            <div className={`${T.text3(dark)} text-xs font-semibold mb-0.5`}>{s.label}</div>
+    <div className="space-y-6">
+
+      {/* ── Page heading ─────────────────────────────────────────────────── */}
+      <div>
+        <p className="text-[10px] font-black tracking-widest uppercase mb-1" style={{ color: "#f59e0b" }}>
+          Overview
+        </p>
+        <h2
+          className={`text-2xl font-black ${T.text1(dark)}`}
+          style={{ fontFamily: "'Playfair Display',Georgia,serif" }}
+        >
+          Audience
+        </h2>
+      </div>
+
+      {/* ── Stat cards ───────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {stats.map((s, i) => (
+          <div
+            key={s.label}
+            className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl p-4 sm:p-5 flex flex-col gap-3
+              hover:-translate-y-0.5 hover:shadow-xl transition-all`}
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
+            {/* Icon */}
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: s.accentBg, border: `1px solid ${s.accentBorder}`, color: s.accent }}
+            >
+              {s.icon}
+            </div>
+            {/* Value */}
+            <div>
+              <div
+                className="font-black text-xl sm:text-2xl leading-none mb-1"
+                style={{ color: s.accent, fontFamily: "'Playfair Display',Georgia,serif" }}
+              >
+                {s.value}
+              </div>
+              <div className={`${T.text3(dark)} text-[10px] font-bold`}>{s.label}</div>
+            </div>
+            {/* Sub */}
             <div className={`${T.text3(dark)} text-[10px]`}>{s.sub}</div>
           </div>
         ))}
       </div>
+
+      {/* ── Bar chart: RSVPs by Event ─────────────────────────────────────── */}
       <div className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl overflow-hidden`}>
-        <div className={`px-4 sm:px-5 py-4 border-b ${T.border(dark)}`}><h3 className={`${T.text1(dark)} font-black text-sm`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>RSVPs by Event</h3></div>
-        <div className="p-4 sm:p-5 space-y-4">
-          {EVENTS.filter(e=>e.rsvps>0).sort((a,b)=>b.rsvps-a.rsvps).map(ev=>{
-            const pctVal=pct(ev.rsvps,EVENTS.reduce((s,e)=>s+e.rsvps,0));
-            const tc=TYPE_META[ev.type]??TYPE_META.default;
-            return(
-              <div key={ev.id} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0"><img src={ev.image} alt={ev.title} className="w-full h-full object-cover"/></div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`${T.text2(dark)} text-xs font-bold truncate mr-2`}>{ev.title}</span>
-                    <span className={`${T.text3(dark)} text-[10px] flex-shrink-0`}>{ev.rsvps.toLocaleString()}</span>
-                  </div>
-                  <div className={`h-1.5 ${d(dark,"bg-white/8","bg-gray-100")} rounded-full overflow-hidden`}>
-                    <div className="h-full rounded-full transition-all" style={{width:`${pctVal*3}%`,background:tc.hex,maxWidth:"100%"}}/>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+
+        {/* Header */}
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${T.border(dark)}`}>
+          <div>
+            <h3
+              className={`${T.text1(dark)} font-black text-sm sm:text-base`}
+              style={{ fontFamily: "'Playfair Display',Georgia,serif" }}
+            >
+              RSVP Count by Event
+            </h3>
+            <p className={`${T.text3(dark)} text-[10px] mt-0.5`}>Top events sorted by attendance</p>
+          </div>
+          <span
+            className={`text-[10px] font-black px-2.5 py-1 rounded-full
+              ${d(dark, "bg-white/6 text-white/35 border border-white/10", "bg-gray-100 text-gray-400 border border-gray-200")}`}
+          >
+            {chartData.length} events
+          </span>
         </div>
+
+        {/* Chart body */}
+        <div className="p-4 sm:p-6">
+          {chartData.length === 0 ? (
+            <div className={`py-16 text-center ${T.text3(dark)} text-sm`}>No RSVP data yet</div>
+          ) : (
+            <div className="space-y-3">
+              {chartData.map((ev, i) => {
+                const barPct   = Math.round((ev.rsvps / maxRsvp) * 100);
+                const tc       = TYPE_META[ev.type] ?? TYPE_META.default;
+                const isTop    = i === 0;
+                // Bar color: top bar = amber gradient, rest = type color faded
+                const barBg    = isTop
+                  ? "linear-gradient(90deg,#f59e0b,#fb923c)"
+                  : dark
+                    ? `${tc.hex}55`
+                    : `${tc.hex}40`;
+
+                return (
+                  <div key={ev.id} className="group">
+                    {/* Label row */}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {/* Rank */}
+                        <span
+                          className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black flex-shrink-0
+                            ${isTop
+                              ? "bg-amber-500 text-white"
+                              : d(dark, "bg-white/6 text-white/30", "bg-gray-100 text-gray-400")
+                            }`}
+                        >
+                          {i + 1}
+                        </span>
+                        {/* Thumbnail */}
+                        <div className="w-6 h-6 rounded-md overflow-hidden flex-shrink-0">
+                          <img src={ev.image} alt={ev.title} className="w-full h-full object-cover"/>
+                        </div>
+                        {/* Title */}
+                        <span
+                          className={`text-xs font-semibold truncate ${T.text2(dark)}
+                            ${d(dark, "group-hover:text-white", "group-hover:text-gray-900")} transition-colors`}
+                        >
+                          {ev.title}
+                        </span>
+                      </div>
+                      {/* Count + type badge */}
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                        <span
+                          className={`hidden sm:inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full
+                            ${tc.bg} ${tc.text}`}
+                        >
+                          <span className={`w-1 h-1 rounded-full ${tc.dot}`}/>
+                          {ev.type}
+                        </span>
+                        <span
+                          className={`text-xs font-black ${isTop ? "text-amber-500" : T.text2(dark)}`}
+                          style={{ fontFamily: "'Playfair Display',Georgia,serif" }}
+                        >
+                          {ev.rsvps.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Bar track */}
+                    <div
+                      className={`h-2 rounded-full overflow-hidden
+                        ${d(dark, "bg-white/6", "bg-gray-100")}`}
+                    >
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${barPct}%`,
+                          background: barBg,
+                          transitionDelay: `${i * 50}ms`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer: capacity context */}
+        {chartData.length > 0 && (
+          <div className={`px-5 py-3 border-t ${T.border(dark)} flex flex-wrap items-center gap-x-5 gap-y-1`}>
+            <span className={`${T.text3(dark)} text-[10px]`}>
+              Top event: <span className={`font-black ${d(dark, "text-amber-400", "text-amber-600")}`}>{chartData[0].title.length > 28 ? chartData[0].title.slice(0,28)+"…" : chartData[0].title}</span>
+            </span>
+            <span className={`${T.text3(dark)} text-[10px]`}>
+              Total shown: <span className={`font-bold ${T.text2(dark)}`}>{chartData.reduce((s,e)=>s+e.rsvps,0).toLocaleString()} RSVPs</span>
+            </span>
+          </div>
+        )}
       </div>
+
     </div>
   );
 }
 
 // ─── Revenue Tab ──────────────────────────────────────────────────────────────
 function TabRevenue({ dark }: { dark: boolean }) {
-  const { events: rawEvents } = useOrganizerEvents();
-  const EVENTS = useMemo(() => rawEvents.map(mapEvent), [rawEvents]);
-  const totalRevenue=EVENTS.reduce((s,e)=>s+e.revenue,0);
-  const revenueEvents=EVENTS.filter(e=>e.revenue>0).sort((a,b)=>b.revenue-a.revenue);
   return (
-    <div className="space-y-5">
-      <h2 className={`${T.text1(dark)} font-black text-lg sm:text-xl`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>Revenue</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        {[{label:"Total Revenue",value:fmt(totalRevenue),sub:"+₹3.2L vs last month",color:"text-emerald-500"},{label:"Avg. per Event",value:fmt(Math.round(totalRevenue/revenueEvents.length)),sub:"across paid events",color:T.text1(dark)},{label:"Pending Payout",value:"₹1.2L",sub:"processing in 3-5 days",color:"text-amber-500"}].map(s=>(
-          <div key={s.label} className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl p-4 sm:p-5`}>
-            <div className={`${s.color} font-black text-2xl sm:text-3xl mb-1`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>{s.value}</div>
-            <div className={`${T.text2(dark)} text-xs font-bold mb-0.5`}>{s.label}</div>
-            <div className={`${T.text3(dark)} text-[10px]`}>{s.sub}</div>
+    <div className="relative min-h-[70vh] flex flex-col items-center justify-center overflow-hidden select-none">
+
+      {/* Ambient blobs */}
+      <div className={`absolute -top-20 -left-20 w-72 h-72 rounded-full blur-3xl opacity-20 pointer-events-none ${dark ? "bg-amber-500" : "bg-amber-300"}`}/>
+      <div className={`absolute -bottom-20 -right-20 w-96 h-96 rounded-full blur-3xl opacity-10 pointer-events-none ${dark ? "bg-orange-600" : "bg-orange-300"}`}/>
+
+      {/* Decorative grid lines */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: dark
+          ? "linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px)"
+          : "linear-gradient(rgba(0,0,0,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,0.04) 1px,transparent 1px)",
+        backgroundSize: "48px 48px",
+      }}/>
+
+      {/* Central card */}
+      <div className={`relative z-10 flex flex-col items-center text-center px-8 py-12 rounded-3xl border max-w-md w-full mx-4
+        ${dark ? "bg-[#13151f]/80 border-white/8 backdrop-blur-xl" : "bg-white/90 border-gray-200 backdrop-blur-xl shadow-xl shadow-gray-200/60"}`}>
+
+        {/* Icon lockup */}
+        <div className="relative mb-7">
+          {/* Outer ring */}
+          <div className={`w-24 h-24 rounded-3xl flex items-center justify-center
+            ${dark ? "bg-amber-400/10 border border-amber-400/20" : "bg-amber-50 border border-amber-200"}`}>
+            {/* Coin stack icon */}
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <ellipse cx="20" cy="30" rx="12" ry="4" fill={dark ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.2)"}/>
+              <rect x="8" y="18" width="24" height="8" rx="4" fill={dark ? "rgba(251,191,36,0.25)" : "rgba(251,191,36,0.35)"}/>
+              <rect x="8" y="18" width="24" height="4" rx="4" fill={dark ? "rgba(251,191,36,0.4)" : "rgba(245,158,11,0.5)"}/>
+              <ellipse cx="20" cy="14" rx="12" ry="4" fill={dark ? "rgba(251,191,36,0.6)" : "#f59e0b"}/>
+              <text x="20" y="18" textAnchor="middle" fontSize="7" fontWeight="900" fill={dark ? "#0c0e1a" : "#fff"} fontFamily="Georgia,serif">₹</text>
+            </svg>
           </div>
-        ))}
-      </div>
-      <div className={`${T.surface(dark)} border ${T.border(dark)} rounded-2xl overflow-hidden`}>
-        <div className={`px-4 sm:px-5 py-4 border-b ${T.border(dark)}`}><h3 className={`${T.text1(dark)} font-black text-sm`} style={{fontFamily:"'Playfair Display',Georgia,serif"}}>Revenue by Event</h3></div>
-        <div className={`divide-y ${d(dark,"divide-white/5","divide-gray-100")}`}>
-          {revenueEvents.map(ev=>(
-            <div key={ev.id} className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 ${T.hover(dark)} transition-all`}>
-              <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0"><img src={ev.image} alt={ev.title} className="w-full h-full object-cover"/></div>
-              <div className="flex-1 min-w-0">
-                <div className={`${T.text2(dark)} text-xs sm:text-sm font-bold truncate`}>{ev.title}</div>
-                <div className={`${T.text3(dark)} text-[10px] mt-0.5`}>{ev.venue.split(",")[0]}</div>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <div className={`${T.text1(dark)} font-black text-sm`}>{fmt(ev.revenue)}</div>
-                <div className={`${T.text3(dark)} text-[10px]`}>{ev.rsvps.toLocaleString()} tickets</div>
-              </div>
+          {/* Floating badge */}
+          <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-400/40">
+            <svg width="12" height="12" fill="none" stroke="white" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+        </div>
+
+        {/* Label pill */}
+        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase mb-4
+          ${dark ? "bg-amber-400/10 border border-amber-400/20 text-amber-400" : "bg-amber-100 border border-amber-200 text-amber-700"}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"/>
+          Coming Soon
+        </div>
+
+        {/* Heading */}
+        <h2 className={`font-black text-2xl sm:text-3xl mb-3 ${dark ? "text-white" : "text-gray-900"}`}
+          style={{fontFamily:"'Playfair Display',Georgia,serif"}}>
+          Revenue Analytics
+        </h2>
+
+        {/* Description */}
+        <p className={`text-sm leading-relaxed mb-8 ${dark ? "text-white/45" : "text-gray-500"}`}>
+          Detailed payout reports, ticket sales breakdowns, and month-over-month revenue trends are on their way.
+        </p>
+
+        {/* Feature teasers */}
+        <div className="w-full space-y-2.5 mb-8">
+          {[
+            { icon: "₹", label: "Payout history & processing status" },
+            { icon: "📊", label: "Per-event revenue breakdown" },
+            { icon: "📈", label: "Month-over-month trend charts" },
+            { icon: "🧾", label: "Downloadable invoices & receipts" },
+          ].map((f, i) => (
+            <div key={i} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left
+              ${dark ? "bg-white/4 border border-white/6" : "bg-gray-50 border border-gray-100"}`}>
+              <span className="text-base leading-none">{f.icon}</span>
+              <span className={`text-xs font-semibold ${dark ? "text-white/50" : "text-gray-500"}`}>{f.label}</span>
+              <span className={`ml-auto text-[9px] font-black px-2 py-0.5 rounded-full
+                ${dark ? "bg-white/6 text-white/25" : "bg-gray-200 text-gray-400"}`}>Soon</span>
             </div>
           ))}
         </div>
+
+        {/* CTA */}
+        <a href="/organizer/subscriptions"
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black text-stone-900 bg-gradient-to-r from-amber-400 to-orange-500 hover:shadow-lg hover:shadow-amber-400/30 hover:scale-[1.01] transition-all">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          Notify me when it's ready
+        </a>
       </div>
+
+      {/* Floating ghost stat cards for atmosphere */}
+      <div className={`hidden sm:block absolute top-12 left-8 px-4 py-3 rounded-2xl border pointer-events-none opacity-30
+        ${dark ? "bg-[#13151f] border-white/8" : "bg-white border-gray-200 shadow-sm"}`}>
+        <div className={`text-[9px] font-black tracking-widest uppercase mb-1 ${dark ? "text-white/25" : "text-gray-400"}`}>Total Revenue</div>
+        <div className={`text-lg font-black blur-[6px] ${dark ? "text-white" : "text-gray-900"}`} style={{fontFamily:"'Playfair Display',serif"}}>₹24.6L</div>
+      </div>
+      <div className={`hidden sm:block absolute bottom-16 right-10 px-4 py-3 rounded-2xl border pointer-events-none opacity-20
+        ${dark ? "bg-[#13151f] border-white/8" : "bg-white border-gray-200 shadow-sm"}`}>
+        <div className={`text-[9px] font-black tracking-widest uppercase mb-1 ${dark ? "text-white/25" : "text-gray-400"}`}>Pending Payout</div>
+        <div className={`text-lg font-black blur-[6px] ${dark ? "text-white" : "text-gray-900"}`} style={{fontFamily:"'Playfair Display',serif"}}>₹1.2L</div>
+      </div>
+
     </div>
   );
 }
@@ -1387,11 +1656,6 @@ export default function OrganizerDashboard() {
 
   // ── Sidebar (shared between desktop and mobile overlay) ────────────────────
 
-
-
-
-
-
   const SidebarContent = () => (
     <div className={`flex flex-col h-full ${T.surface(dark)} transition-colors duration-300`}>
       {/* Logo */}
@@ -1433,29 +1697,7 @@ export default function OrganizerDashboard() {
         ))}
       </nav>
 
-      {/* Profile strip */}
-      {/* <div className={`px-4 py-4 border-t ${T.border(dark)} mt-auto`}>
-        <div className="flex items-start gap-3 mb-3">
-          <div className="relative flex-shrink-0">
-            {profilePic ? <img src={profilePic} alt={name??""} className="w-9 h-9 rounded-full object-cover ring-2 ring-amber-400/30"/> :
-              <div className="w-9 h-9 rounded-full bg-amber-400/15 ring-2 ring-amber-400/25 flex items-center justify-center text-amber-500 font-black text-sm">{avatarFallback}</div>}
-            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center">
-              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className={`${T.text1(dark)} text-xs font-bold truncate`}>{name ?? "Organizer"}</div>
-            <div className={`${T.text3(dark)} text-[10px] truncate`}>{email ?? ""}</div>
-            {location && <div className="flex items-center gap-1 mt-0.5"><svg className={`w-2.5 h-2.5 ${T.text3(dark)} flex-shrink-0`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><span className={`${T.text3(dark)} text-[10px] truncate`}>{location}</span></div>}
-          </div>
-        </div>
-        {bio && <p className={`${T.text3(dark)} text-[10px] leading-relaxed line-clamp-2 mb-3`}>{bio}</p>}
-        <button onClick={() => setLogoutModal(true)}
-          className={`w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-rose-500 ${d(dark,"bg-rose-500/12 hover:bg-rose-500/20 border border-rose-500/20","bg-rose-50 hover:bg-rose-100 border border-rose-100")} rounded-xl transition-all`}>
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Sign out
-        </button>
-      </div> */}
+   
     </div>
   );
 
