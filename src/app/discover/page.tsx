@@ -10,6 +10,7 @@ import { useDiscoverEvents } from "@/hooks/eventimist/user/events/useDiscoverEve
 import type { DiscoverEvent } from "@/services/eventimist/user/events/discoverEvents.service";
 import { useUserAuth } from "@/store/eventimist/user/auth/UserAuthState";
 import { useUserLogout } from "@/hooks/eventimist/user/sessions/useUserLogout";
+import { EventSearchModal } from "@/components/EventSearchModal";
 
 // ─── All 15 categories ────────────────────────────────────────────────────────
 const CATEGORIES: { value: string; label: string; emoji: string; hex: string }[] = [
@@ -716,6 +717,8 @@ useEffect(() => {
             </div>
           </div>
         </div>
+        
+      <EventSearchModal dark={dark} />
       </div>
     </>
   );
