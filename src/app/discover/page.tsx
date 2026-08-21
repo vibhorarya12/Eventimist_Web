@@ -274,9 +274,7 @@ function DiscoverPageInner() {
   const markersRef = useRef<Map<string, any>>(new Map());
 
   // Centre map on user's location or fallback Pune
-  const MAP_CENTER = coords
-    ? { lat: coords.latitude, lng: coords.longitude }
-    : { lat: 18.5204, lng: 73.8567 };
+
 
   // ── Theme tokens ────────────────────────────────────────────────────────────
   const bgPage  = dark ? "#0d0f17"  : "#f5f5f4";
@@ -312,7 +310,7 @@ function DiscoverPageInner() {
   const bootMap = useCallback(() => {
     if (!mapDivRef.current) return;
     const map = new (window as any).google.maps.Map(mapDivRef.current, {
-      center: MAP_CENTER, zoom: 12, disableDefaultUI: true, gestureHandling: "greedy",
+      center: { lat: 18.5204, lng: 73.8567 }, zoom: 12, disableDefaultUI: true, gestureHandling: "greedy",
       styles: dark ? DARK_STYLES : LIGHT_STYLES,
     });
     mapObjRef.current = map;
@@ -371,6 +369,16 @@ function DiscoverPageInner() {
     return () => clearTimeout(t);
   }, [view, mapReady]);
   
+  useEffect(() => {
+  if (!mapObjRef.current || !mapReady) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      mapObjRef.current.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      mapObjRef.current.setZoom(12);
+    },
+    () => {} // stay on Pune if denied
+  );
+}, [mapReady]);
 
  useEffect(() => {
   if (!sentinelRef.current) return;
@@ -395,7 +403,13 @@ useEffect(() => {
 
   const zoomIn   = useCallback(() => mapObjRef.current?.setZoom((mapObjRef.current.getZoom() ?? 12) + 1), []);
   const zoomOut  = useCallback(() => mapObjRef.current?.setZoom((mapObjRef.current.getZoom() ?? 12) - 1), []);
-  const recenter = useCallback(() => { mapObjRef.current?.panTo(MAP_CENTER); mapObjRef.current?.setZoom(12); }, []);
+  const recenter = useCallback(() => {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => mapObjRef.current?.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+    () => mapObjRef.current?.panTo({ lat: 18.5204, lng: 73.8567 })
+  );
+  mapObjRef.current?.setZoom(12);
+}, []);
 
   return (
     <>
@@ -554,7 +568,7 @@ useEffect(() => {
                 <div className="flex items-center gap-2 ml-auto">
                   <span className={`text-[10px] font-bold flex-shrink-0 ${t3}`}>Radius</span>
                   <input
-                    type="range" min="1" max="100" step="1" value={radius}
+                    type="range" min="1" max="1000" step="1" value={radius}
                     onChange={e => setRadius(Number(e.target.value))}
                     className="w-24 accent-amber-500 cursor-pointer"
                   />
