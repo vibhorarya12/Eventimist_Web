@@ -48,4 +48,14 @@ eventimistClient.interceptors.response.use(
   }
 );
 
+// ─── Public client — no auth token, for public endpoints ─────────────────────
+export const publicClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_EVENTIMIST_API_URL,
+  timeout: 15000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+
 export default eventimistClient;
