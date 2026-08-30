@@ -128,9 +128,8 @@ function HeroCarousel({ onSlideChange }: { onSlideChange: (i: number) => void })
             <button
               key={i}
               onClick={() => goTo(i)}
-              className={`rounded-full transition-all duration-400 ${
-                i === current ? "w-7 h-1.5 bg-amber-400" : "w-1.5 h-1.5 bg-white/30 hover:bg-white/60"
-              }`}
+              className={`rounded-full transition-all duration-400 ${i === current ? "w-7 h-1.5 bg-amber-400" : "w-1.5 h-1.5 bg-white/30 hover:bg-white/60"
+                }`}
             />
           ))}
         </div>
@@ -478,9 +477,9 @@ export default function VolunteerPage() {
         {/* ── Ticker strip ─────────────────────────────────────────────────── */}
         <div className="overflow-hidden bg-amber-400 py-3">
           <div className="flex ticker whitespace-nowrap">
-            {[...Array(3)].flatMap(() =>
+            {[...Array(3)].flatMap((_, arrIdx) =>
               ["Volunteer Match", "Skill-based Opportunities", "Connect with Orgs", "Make an Impact", "Coming Soon", "Early Access Open"].map((t, i) => (
-                <span key={i + t} className="mx-8 text-stone-900 text-xs font-black tracking-widest uppercase">
+                <span key={`${arrIdx}-${i}`} className="mx-8 text-stone-900 text-xs font-black tracking-widest uppercase">
                   {t}
                   <span className="mx-8 text-stone-900/30">◆</span>
                 </span>
