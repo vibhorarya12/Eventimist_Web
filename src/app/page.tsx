@@ -31,11 +31,12 @@ function useDark() {
 
 // ─── User menu dropdown ───────────────────────────────────────────────────────
 function UserMenu({ dark }: { dark: boolean }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]               = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const name       = useUserAuth(s => s.name);
   const profilePic = useUserAuth(s => s.profilePic);
-  const { logout } = useUserLogout();
+  const { logout, loading: loggingOut } = useUserLogout();
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -132,7 +133,7 @@ function UserMenu({ dark }: { dark: boolean }) {
           <div className="px-1.5 pb-1.5">
             <div className="h-px mb-1.5" style={{ background: bdr }}/>
             <button
-              onClick={() => { setOpen(false); logout(); }}
+              onClick={() => { setOpen(false); setShowLogoutModal(true); }}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-150 text-xs font-semibold text-left"
               style={{ color: "#ef4444" }}
               onMouseEnter={e => (e.currentTarget.style.background = "rgba(239,68,68,0.08)")}
@@ -145,6 +146,88 @@ function UserMenu({ dark }: { dark: boolean }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── Logout confirm modal ─────────────────────────────────────────── */}
+      {showLogoutModal && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[998]"
+            style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)", animation: "backdropIn 0.2s ease both" }}
+            onClick={() => { if (!loggingOut) setShowLogoutModal(false); }}
+          />
+          {/* Modal */}
+          <div className="fixed inset-0 z-[999] flex items-center justify-center pointer-events-none">
+            <div
+              className="pointer-events-auto flex flex-col items-center gap-5 rounded-3xl p-8 mx-4"
+              style={{
+                width: "min(340px, calc(100vw - 32px))",
+                background: dark ? "#13151f" : "#ffffff",
+                border: `1px solid ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}`,
+                boxShadow: "0 32px 80px rgba(0,0,0,0.3)",
+                animation: "dropIn 0.25s cubic-bezier(.22,1,.36,1) both",
+              }}
+            >
+              {/* Avatar */}
+              <div className="relative">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center font-black text-xl text-white flex-shrink-0"
+                  style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)" }}>
+                  {profilePic
+                    ? <img src={profilePic} alt={name} className="w-full h-full object-cover"/>
+                    : initials}
+                </div>
+                {/* Small logout icon badge */}
+                <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center border-2"
+                  style={{ borderColor: dark ? "#13151f" : "#ffffff" }}>
+                  <svg width="10" height="10" fill="none" stroke="white" viewBox="0 0 24 24" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7"/>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Text */}
+              <div className="text-center">
+                <p className="font-black text-base mb-1"
+                  style={{ color: dark ? "rgba(255,255,255,0.92)" : "#1c1917", fontFamily: "'Playfair Display',Georgia,serif" }}>
+                  Sign out, {name.split(" ")[0]}?
+                </p>
+                <p className="text-xs leading-relaxed"
+                  style={{ color: dark ? "rgba(255,255,255,0.4)" : "#78716c" }}>
+                  You'll need to sign back in to RSVP events and access your profile.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  disabled={loggingOut}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+                  style={{ background: dark ? "rgba(255,255,255,0.07)" : "#f5f5f4", color: dark ? "rgba(255,255,255,0.6)" : "#78716c" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={logout}
+                  disabled={loggingOut}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all flex items-center justify-center gap-2 disabled:opacity-80"
+                  style={{ background: loggingOut ? "#b91c1c" : "#ef4444", boxShadow: "0 4px 14px rgba(239,68,68,0.3)" }}
+                >
+                  {loggingOut ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      Signing out…
+                    </>
+                  ) : "Yes, sign out"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -739,6 +822,7 @@ export default function Page() {
         .gallery-scroll { animation: gallery 22s linear infinite; }
         .gallery-scroll:hover { animation-play-state: paused; }
         @keyframes dropIn { from { opacity:0; transform:translateY(-8px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+        @keyframes backdropIn { from { opacity:0; } to { opacity:1; } }
       `}</style>
 
       <div className="min-h-screen transition-colors duration-300" style={{ background: dark ? "#0d0f17" : "#ffffff", color: dark ? "#fff" : "#1c1917" }}>
