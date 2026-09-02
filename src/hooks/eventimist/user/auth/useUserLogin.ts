@@ -39,6 +39,7 @@ export function useUserLogin(
         email:       data.email,
         profilePic:  data.profilePic,
         accessToken: data.token,
+        refreshToken :data.refreshToken,
       });
 
       // 2. Set cookie synchronously so middleware sees it before redirect

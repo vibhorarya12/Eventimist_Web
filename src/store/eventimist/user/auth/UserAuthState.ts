@@ -8,12 +8,13 @@ interface UserAuthState {
   email:                string;
   profilePic:           string | null;
   accessToken:          string;
+  refreshToken: string;
   rsvpEventIds:         number[];
   bookmarkedEventIds:   number[];
   interactionsLoaded:   boolean;
 
   // Actions
-  setAuth:              (data: Omit<UserAuthState, "setAuth" | "clearAuth" | "isAuthenticated" | "setRsvpEventIds" | "setBookmarkedEventIds" | "setInteractionsLoaded">) => void;
+setAuth: (data: Partial<Omit<UserAuthState, "setAuth" | "clearAuth" | "isAuthenticated" | "setRsvpEventIds" | "setBookmarkedEventIds" | "setInteractionsLoaded">>) => void;
   clearAuth:            () => void;
   isAuthenticated:      () => boolean;
   setRsvpEventIds:      (ids: number[]) => void;
@@ -27,6 +28,7 @@ const EMPTY = {
   profilePic: null,
   accessToken: "",
   rsvpEventIds: [],
+  refreshToken : "" ,
   bookmarkedEventIds: [],
   interactionsLoaded: false,
 };
@@ -54,6 +56,7 @@ export const useUserAuth = create<UserAuthState>()(
         email:              s.email,
         profilePic:         s.profilePic,
         accessToken:        s.accessToken,
+        refreshToken:       s.refreshToken,
         rsvpEventIds:       s.rsvpEventIds,
         bookmarkedEventIds: s.bookmarkedEventIds,
         interactionsLoaded: s.interactionsLoaded,
@@ -70,3 +73,4 @@ export const useUserToken               = () => useUserAuth(s => s.accessToken);
 export const useUserRsvpEventIds        = () => useUserAuth(s => s.rsvpEventIds);
 export const useUserBookmarkedEventIds  = () => useUserAuth(s => s.bookmarkedEventIds);
 export const useUserInteractionsLoaded  = () => useUserAuth(s => s.interactionsLoaded);
+export const useUserRefreshToken = () => useUserAuth(s => s.refreshToken);

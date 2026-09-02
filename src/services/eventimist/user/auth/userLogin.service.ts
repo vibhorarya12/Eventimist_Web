@@ -10,6 +10,7 @@ export interface UserLoginResponse {
   name:       string;
   email:      string;
   token:      string;
+  refreshToken:string;
   profilePic: string | null;
 }
 
@@ -26,5 +27,6 @@ export async function userLogin(
     "/auth/user/login",
     body
   );
+  console.log("<<<<<<<<<<<<",res.data);
   return res.data;
 }
