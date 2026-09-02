@@ -1,24 +1,31 @@
-"use client";
-
 // src/hooks/eventimist/user/sessions/useUserLogout.ts
 
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUserAuth } from "@/store/eventimist/user/auth/UserAuthState";
+import { userLogout } from "@/services/eventimist/user/auth/userLogout.service";
 
 export function useUserLogout() {
-  const clearAuth = useUserAuth(s => s.clearAuth);
-  const router    = useRouter();
+  const [loading, setLoading] = useState(false);
+  const refreshToken = useUserAuth(s => s.refreshToken);
+  const clearAuth    = useUserAuth(s => s.clearAuth);
+  const router       = useRouter();
 
-  const logout = () => {
-    // 1. Clear Zustand + localStorage
-    clearAuth();
+  const logout = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (refreshToken) await userLogout(refreshToken);
+    } catch {
+      // silently fail — still clear local state
+    } finally {
+      // Clear Zustand + localStorage
+      clearAuth();
+      // Clear cookie
+      document.cookie = "user-token=; path=/; max-age=0; SameSite=Strict";
+      setLoading(false);
+      router.replace("/");
+    }
+  }, [refreshToken, clearAuth, router]);
 
-    // 2. Clear cookie so middleware stops passing user through
-    document.cookie = "user-token=; path=/; max-age=0";
-
-    // 3. Redirect to home or user auth
-    router.replace("/");
-  };
-
-  return { logout };
+  return { logout, loading };
 }
