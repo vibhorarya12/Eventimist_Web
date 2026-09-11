@@ -59,6 +59,8 @@ export interface AuthState {
 
   isAuthenticated: boolean;
 
+  refreshToken: string | null;
+
   isHydrated: boolean;
 }
 
@@ -113,6 +115,8 @@ const INITIAL: AuthState = {
 
   accessToken: null,
 
+  refreshToken: null,
+
   subscription: null,
 
   subscriptionLoaded: false,
@@ -120,6 +124,8 @@ const INITIAL: AuthState = {
   isAuthenticated: false,
 
   isHydrated: false,
+
+
 };
 
 // ─── Zustand Store ──────────────────────────────────────────────────────────
@@ -224,6 +230,8 @@ export const useOrganizerAuth =
 
           accessToken: state.accessToken,
 
+          refreshToken: state.refreshToken,
+
           subscription: state.subscription,
 
           subscriptionLoaded:
@@ -283,3 +291,6 @@ export const useIsOrganizerHydrated = () =>
   useOrganizerAuth(
     (s) => s.isHydrated
   );
+
+export const useOrganizerRefreshToken = () =>
+  useOrganizerAuth(s => s.refreshToken);  

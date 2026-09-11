@@ -15,6 +15,7 @@ export interface OrganizerLoginResponse {
   token:       string;
   coverImage:  string;
   location:    string;
+  refreshToken: string;
 }
 
 // ─── Error response shape ─────────────────────────────────────────────────────

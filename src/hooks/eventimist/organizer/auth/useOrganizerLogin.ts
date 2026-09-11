@@ -42,6 +42,7 @@ export function useOrganizerLogin(): UseOrganizerLoginReturn {
         coverImage:  data.coverImage,
         location:    data.location,
         accessToken: data.token,
+        refreshToken :data.refreshToken
       });
 
       // Redirect to dashboard on success

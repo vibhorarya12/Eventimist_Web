@@ -66,6 +66,7 @@ export function useOrganizerSignup(): UseOrganizerSignupReturn {
         coverImage:  data.coverImage,
         location:    data.location,
         accessToken: data.token,
+        refreshToken : data.refreshToken
       });
 
       router.replace("/organizer/dashboard");

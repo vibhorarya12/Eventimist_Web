@@ -1,27 +1,29 @@
-"use client";
+// src/hooks/eventimist/organizer/sessions/useOrganizerLogout.ts
 
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useOrganizerAuth } from "@/store/eventimist/organizer/auth/AuthState";
-import { useClerk } from "@clerk/nextjs";
+import { organizerLogout } from "@/services/eventimist/organizer/auth/organizerLogout.service";
 
 export function useOrganizerLogout() {
-  const clearAuth = useOrganizerAuth((s) => s.clearAuth);
-  const router    = useRouter();
-  const {signOut} = useClerk();
+  const [loading, setLoading] = useState(false);
+  const refreshToken = useOrganizerAuth(s => s.refreshToken);
+  const clearAuth    = useOrganizerAuth(s => s.clearAuth);
+  const router       = useRouter();
 
-  const logout = () => {
-    // 1. Clear Zustand store + localStorage
-    clearAuth();
+  const logout = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (refreshToken) await organizerLogout(refreshToken);
+    } catch {
+      // silently fail — still clear local state
+    } finally {
+      clearAuth();
+      document.cookie = "organizer-token=; path=/; max-age=0; SameSite=Strict";
+      setLoading(false);
+      router.replace("/organizer/auth");
+    }
+  }, [refreshToken, clearAuth, router]);
 
-    // 2. Clear the organizer-token cookie so middleware
-    //    stops letting this browser through immediately
-    document.cookie = "organizer-token=; path=/; max-age=0";
-
-    // 3. Redirect to auth page
-    
-    signOut({redirectUrl: "/organizer/auth"});
-    router.replace("/organizer/auth");
-  };
-
-  return { logout };
+  return { logout, loading };
 }

@@ -2,6 +2,7 @@ import axios from "axios";
 import { useOrganizerAuth } from "@/store/eventimist/organizer/auth/AuthState";
 import { useUserAuth } from "@/store/eventimist/user/auth/UserAuthState";
 import { userRefreshToken } from "@/services/eventimist/user/auth/userRefreshToken.service";
+import { organizerRefreshToken } from "@/services/eventimist/organizer/auth/organizerRefreshToken.service";
 
 const eventimistClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_EVENTIMIST_API_URL,
@@ -38,9 +39,10 @@ eventimistClient.interceptors.request.use(
 eventimistClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const config = error.config;
-    const status = error.response?.status;
+    const config    = error.config;
+    const status    = error.response?.status;
     const errorCode = error.response?.data?.error;
+
     // ── User token refresh flow ──────────────────────────────────────────────
     // Only trigger when:
     // 1. Status is 401
@@ -51,10 +53,8 @@ eventimistClient.interceptors.response.use(
       status === 401 &&
       errorCode === "ACCESS_TOKEN_EXPIRED" &&
       config.headers?.Authorization?.startsWith("Bearer ") &&
-      !config._retry &&
-      (config.url?.includes("/user/") || config.url?.includes("/auth/user"))
+      !config._retry
     ) {
-      console.log("<<<<<<<<<<<<access Token expired , geting refresh");
       config._retry = true;
 
       const { refreshToken, setAuth, clearAuth } = useUserAuth.getState();
@@ -65,11 +65,11 @@ eventimistClient.interceptors.response.use(
 
           // Persist new tokens
           setAuth({
-            accessToken: data.token,
+            accessToken:  data.token,
             refreshToken: data.refreshToken,
-            name: data.name,
-            email: data.email,
-            profilePic: data.profilePic,
+            name:         data.name,
+            email:        data.email,
+            profilePic:   data.profilePic,
           });
 
           // Update cookie for middleware
@@ -89,12 +89,55 @@ eventimistClient.interceptors.response.use(
       }
     }
 
-    // ── Organizer 401 — redirect to auth ────────────────────────────────────
+    // ── Organizer token refresh flow ─────────────────────────────────────────
     if (
       status === 401 &&
+      errorCode === "ACCESS_TOKEN_EXPIRED" &&
+      config.headers?.Authorization?.startsWith("Bearer ") &&
+      !config._retry &&
+      (config.url?.includes("/organizer/") || config.url?.includes("/auth/organizer"))
+    ) {
+      config._retry = true;
+
+      const { refreshToken, setAuth, clearAuth } = useOrganizerAuth.getState();
+
+      if (refreshToken) {
+        try {
+          const data = await organizerRefreshToken(refreshToken);
+
+          setAuth({
+            accessToken:  data.token,
+            refreshToken: data.refreshToken,
+            name:         data.name,
+            email:        data.email,
+            bio:          data.bio,
+            profilePic:   data.profilePic,
+            coverImage:   data.coverImage,
+            location:     data.location,
+          });
+
+          document.cookie = `organizer-token=${data.token}; path=/; SameSite=Strict`;
+
+          config.headers.Authorization = `Bearer ${data.token}`;
+          return eventimistClient(config);
+
+        } catch {
+          clearAuth();
+          document.cookie = "organizer-token=; path=/; max-age=0; SameSite=Strict";
+          window.location.href = "/organizer/auth";
+          return Promise.reject(error);
+        }
+      }
+    }
+
+    // ── Organizer 401 non-expired (wrong token, revoked etc.) ────────────────
+    if (
+      status === 401 &&
+      errorCode !== "ACCESS_TOKEN_EXPIRED" &&
       (config?.url?.includes("/organizer/") || config?.url?.includes("/auth/organizer"))
     ) {
       useOrganizerAuth.getState().clearAuth();
+      document.cookie = "organizer-token=; path=/; max-age=0; SameSite=Strict";
       window.location.href = "/organizer/auth";
     }
 

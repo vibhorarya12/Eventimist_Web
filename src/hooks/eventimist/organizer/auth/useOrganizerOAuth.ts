@@ -53,6 +53,7 @@ export function useOrganizerOAuth(): UseOrganizerOAuthReturn {
         coverImage:  data.coverImage,
         location:    data.location,
         accessToken: data.token,
+        refreshToken : data.refreshToken
       });
 
       // Write cookie synchronously before router.replace so the middleware
@@ -89,6 +90,7 @@ export function useOrganizerOAuth(): UseOrganizerOAuthReturn {
         coverImage:  data.coverImage,
         location:    data.location,
         accessToken: data.token,
+        refreshToken : data.refreshToken
       });
 
       // Same fix — write cookie before redirect
