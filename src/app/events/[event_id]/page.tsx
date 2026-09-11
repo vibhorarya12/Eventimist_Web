@@ -104,7 +104,7 @@ function Carousel({ images }: { images: string[] }) {
 function RSVPButton({ eventId, count }: { eventId: number; count: number }) {
   const token = useUserToken();
   const interactionsLoaded = useUserInteractionsLoaded();
-
+  const [showSignInModal, setShowSignInModal] = useState(false);
   const { rsvpEvent, getUserInteractions } = useUserActions(token);
 
   const rsvpEventIds = useUserRsvpEventIds();
@@ -134,9 +134,9 @@ function RSVPButton({ eventId, count }: { eventId: number; count: number }) {
   const isDisabled = state === "loading" || rsvpEvent.loading || getUserInteractions.loading;
 
   const handle = async () => {
+    console.log("token <<<<<<<<<<<<<,",token);
     if (!token) {
-      setShowError(true);
-      setTimeout(() => setShowError(false), 3000);
+      setShowSignInModal(true);
       return;
     }
 
@@ -211,13 +211,43 @@ function RSVPButton({ eventId, count }: { eventId: number; count: number }) {
           </>
         )}
       </button>
-      {showError && (
-        <p className="text-xs text-red-600 text-center">
-          {!token
-            ? "Please sign in to reserve a spot"
-            : rsvpEvent.error || "Failed. Please try again."}
-        </p>
-      )}
+       {showSignInModal && (
+  <>
+    {/* Backdrop */}
+    <div className="fixed inset-0 z-[998] bg-black/40 backdrop-blur-sm"
+      onClick={() => setShowSignInModal(false)}/>
+    {/* Modal */}
+    <div className="fixed inset-0 z-[999] flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto bg-white rounded-3xl shadow-2xl p-8 flex flex-col items-center gap-4 mx-4"
+        style={{ width: "min(360px, calc(100vw - 32px))" }}>
+        <div className="w-12 h-12 rounded-2xl bg-stone-100 flex items-center justify-center text-2xl">🎟️</div>
+        <div className="text-center">
+          <p className="font-black text-stone-900 text-base"
+            style={{ fontFamily: "'DM Serif Display',Georgia,serif" }}>
+            Sign in to RSVP
+          </p>
+          <p className="text-stone-400 text-xs mt-1.5 leading-relaxed">
+            Create a free account to reserve your spot and manage your events.
+          </p>
+        </div>
+        <a href="/user"
+          className="w-full text-center bg-stone-900 hover:bg-stone-700 text-white font-bold py-3 rounded-xl text-sm transition-all">
+          Sign In / Sign Up
+        </a>
+        <button onClick={() => setShowSignInModal(false)}
+          className="text-xs text-stone-400 hover:text-stone-600 transition-colors">
+          Maybe later
+        </button>
+      </div>
+    </div>
+  </>
+)}
+
+{/* {showError && (
+  <p className="text-xs text-red-600 text-center">
+    {rsvpEvent.error || "Failed. Please try again."}
+  </p>
+)} */}
     </div>
   );
 }
