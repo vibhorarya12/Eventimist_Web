@@ -60,6 +60,7 @@ export function useUserSignup(
         name:        data.name,
         email:       data.email,
         profilePic:  data.profilePic,
+        refreshToken:data.refreshToken,
         accessToken: data.token,
       });
 

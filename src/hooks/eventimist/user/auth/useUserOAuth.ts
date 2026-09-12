@@ -80,6 +80,7 @@ export function useUserOAuth(
         name: data.name,
         email: data.email,
         profilePic: data.profilePic,
+        refreshToken:data.refreshToken,
         accessToken: data.token,
       });
 
