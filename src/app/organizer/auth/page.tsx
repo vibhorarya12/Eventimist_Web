@@ -251,7 +251,7 @@ function OtpScreen({
 type Tab = "signin" | "signup";
 
 function AuthPanel() {
-  const [tab, setTab] = useState<Tab>("signup");
+  const [tab, setTab] = useState<Tab>("signin");
 
   // ── Signup hook (Clerk + backend) ─────────────────────────────────────────
  const {
@@ -359,9 +359,9 @@ function AuthPanel() {
       {/* Tab switcher */}
       <div className="px-10 lg:px-12">
         <div className="flex bg-stone-100 rounded-2xl p-1 mb-8">
-          {(["signup","signin"] as Tab[]).map(t => (
+          {(["signin","signup"] as Tab[]).map(t => (
             <button key={t} onClick={() => switchTab(t)}
-              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${tab === t ? "bg-white text-stone-900 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}>
+              className={`flex-1 py-2.5 hover:cursor-pointer text-sm font-bold rounded-xl transition-all duration-300 ${tab === t ? "bg-white text-stone-900 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}>
               {t === "signup" ? "Create Account" : "Sign In"}
             </button>
           ))}
