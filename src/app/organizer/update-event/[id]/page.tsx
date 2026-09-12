@@ -229,7 +229,7 @@ function GoogleMap({ lat, lng, venueName, dark }: { lat: number|""; lng: number|
     </div>
   );
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  const src    = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${lat},${lng}&zoom=15&maptype=roadmap`;
+ const src = `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`;
   return (
     <iframe src={src} width="100%" height="144" className="rounded-xl border-0 w-full" loading="lazy" allowFullScreen referrerPolicy="no-referrer-when-downgrade" title={venueName}/>
   );
