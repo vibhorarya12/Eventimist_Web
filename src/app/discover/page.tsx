@@ -200,7 +200,7 @@ function Nav({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
             style={{fontFamily:"'Playfair Display',Georgia,serif"}}>eventimist</span>
         </a>
         <div className="hidden md:flex items-center gap-0.5 text-sm flex-1">
-          {[["Discover","/discover",true],["Organise","/organize",false],["Eventix Space","/eventix",false],["Volunteer","/volunteer",false]].map(([l,h,a]) => (
+          {[["Discover","/discover",true],["Organise","/organizer",false],["Eventix Space","/eventix",false],["Volunteer","/volunteer",false]].map(([l,h,a]) => (
             <a key={l as string} href={h as string}
               className={`px-3 py-1.5 rounded-xl font-semibold transition-all text-sm ${a ? act : link}`}>{l}</a>
           ))}
