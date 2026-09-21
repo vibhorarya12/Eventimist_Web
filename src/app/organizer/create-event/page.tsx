@@ -140,12 +140,7 @@ function GoogleMap({ lat, lng, venueName, dark }: {
   }
 
   // Google Maps Embed API — coords mode, no JS SDK needed
-  const src =
-    `https://www.google.com/maps/embed/v1/place` +
-    `?key=${key}` +
-    `&q=${lat},${lng}` +
-    `&zoom=16` +
-    `&maptype=roadmap`;
+  const src = `https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
 
   return (
     <div className={`relative w-full h-48 sm:h-56 rounded-xl overflow-hidden border ${T.border(dark)}`}>
