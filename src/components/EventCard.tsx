@@ -157,7 +157,6 @@ export function EventCard({ event, onClick, active, dark = true }: {
         <h3 className={`font-bold text-sm leading-snug mb-1 line-clamp-2 ${d(dark,"text-white","text-stone-900")}`}
           style={{fontFamily:"'Playfair Display',Georgia,serif"}}>{event.title}</h3>
         <p className={`text-xs leading-relaxed line-clamp-2 mb-3 ${d(dark,"text-white/35","text-stone-400")}`}>{event.description}</p>
-
         <div className="space-y-1.5 mb-3">
           {[
             { icon:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>, text:`${fmtDate(event.date)} · ${fmtTime(event.date)}` },
@@ -183,8 +182,19 @@ export function EventCard({ event, onClick, active, dark = true }: {
 
         <div className={`flex items-center justify-between pt-3 border-t ${d(dark,"border-white/6","border-stone-100")}`}>
           <div className="flex items-center gap-2">
-            <img src={event.organizerProfilepic} alt={event.organizerName}
-              className={`w-6 h-6 rounded-full object-cover ring-2 ${d(dark,"ring-white/10","ring-stone-200")}`}/>
+           {event.organizerProfilepic ? (
+  <img
+    src={event.organizerProfilepic}
+    alt={event.organizerName}
+    className={`w-6 h-6 rounded-full object-cover ring-2 ${d(dark,"ring-white/10","ring-stone-200")}`}
+  />
+) : (
+  <div className={`w-6 h-6 rounded-full ring-2 flex items-center justify-center text-[10px] font-black text-white flex-shrink-0
+    ${d(dark,"ring-white/10","ring-stone-200")}`}
+    style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)" }}>
+    {event.organizerName?.charAt(0).toUpperCase() ?? "?"}
+  </div>
+)}
             <div>
               <div className={`text-[10px] font-semibold leading-none ${d(dark,"text-white/60","text-stone-600")}`}>{event.organizerName}</div>
               <div className={`text-[9px] mt-0.5 ${d(dark,"text-white/25","text-stone-400")}`}>@{event.organizer}</div>
