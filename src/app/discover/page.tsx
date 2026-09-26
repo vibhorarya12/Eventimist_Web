@@ -12,6 +12,9 @@ import { useUserAuth } from "@/store/eventimist/user/auth/UserAuthState";
 import { useUserLogout } from "@/hooks/eventimist/user/sessions/useUserLogout";
 import { EventSearchModal } from "@/components/EventSearchModal";
 
+import { useInitLocation } from "@/hooks/eventimist/user/location/useInitLocation";
+import { useLocationStore } from "@/store/eventimist/user/location/LocationState";
+
 // ─── All 15 categories ────────────────────────────────────────────────────────
 const CATEGORIES: { value: string; label: string; emoji: string; hex: string }[] = [
   { value:"Music",         label:"Music",         emoji:"🎵", hex:"#8b5cf6" },
@@ -238,6 +241,86 @@ export default function DiscoverPage() {
   );
 }
 
+function CitySearch({ dark, onSelect }: {
+  dark: boolean;
+  onSelect: (lat: number, lng: number, city: string) => void;
+}) {
+  const [open, setOpen]       = useState(false);
+  const [q, setQ]             = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  useEffect(() => {
+    if (!q.trim()) { setResults([]); return; }
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&featuretype=city`, { headers: { "Accept-Language": "en" } });
+        const data = await res.json();
+        setResults(data);
+      } catch {} finally { setLoading(false); }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Search city"
+        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all hover:scale-110
+          ${dark ? "bg-white/8 hover:bg-white/14 text-white/50 hover:text-white" : "bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-700"}`}>
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className={`absolute top-full left-0 mt-2 w-56 rounded-2xl border shadow-xl overflow-hidden z-50
+          ${dark ? "bg-[#13151f] border-white/8" : "bg-white border-stone-200"}`}>
+          <div className="p-2">
+            <input
+              autoFocus
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search city…"
+              className={`w-full px-3 py-2 rounded-xl text-xs outline-none border transition-all
+                ${dark ? "bg-white/6 border-white/10 text-white placeholder:text-white/25 focus:border-amber-400/50"
+                       : "bg-stone-50 border-stone-200 text-stone-900 placeholder:text-stone-400 focus:border-amber-400"}`}
+            />
+          </div>
+          {loading && (
+            <div className={`px-4 py-3 text-[11px] ${dark ? "text-white/30" : "text-stone-400"}`}>Searching…</div>
+          )}
+          {results.map((r, i) => (
+            <button key={i}
+              onClick={() => {
+                onSelect(parseFloat(r.lat), parseFloat(r.lon), r.display_name.split(",")[0]);
+                setOpen(false); setQ(""); setResults([]);
+              }}
+              className={`flex flex-col w-full px-4 py-2.5 text-left transition-all
+                ${dark ? "hover:bg-white/6 text-white/70" : "hover:bg-stone-50 text-stone-700"}`}>
+              <span className="text-xs font-semibold">{r.display_name.split(",")[0]}</span>
+              <span className={`text-[10px] truncate ${dark ? "text-white/30" : "text-stone-400"}`}>
+                {r.display_name.split(",").slice(1, 3).join(",")}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
 function DiscoverPageInner() {
   const [dark,        setDark]        = useState(false);
   const [query,       setQuery]       = useState("");
@@ -264,7 +347,7 @@ function DiscoverPageInner() {
   loadMore,       // ← add
   loadingMore,    // ← add
   totalEvents,    // ← add
-  } = useDiscoverEvents(10);
+  } = useDiscoverEvents(50);
 
   // Map API events → EventCard shape
   const allEvents: Event[] = rawEvents.map(mapDiscoverEvent);
@@ -274,6 +357,20 @@ function DiscoverPageInner() {
   const markersRef = useRef<Map<string, any>>(new Map());
 
   // Centre map on user's location or fallback Pune
+  
+
+
+const storedLat = useLocationStore(s => s.latitude);
+const storedLng = useLocationStore(s => s.longitude);
+const city      = useLocationStore(s => s.city);
+const country   = useLocationStore(s => s.country);
+
+const setLocation   = useLocationStore(s => s.setLocation);
+const clearLocation = useLocationStore(s => s.clearLocation);
+// const storedRadius  = useLocationStore(s => s.radius);
+
+
+useInitLocation();
 
 
   // ── Theme tokens ────────────────────────────────────────────────────────────
@@ -369,14 +466,23 @@ function DiscoverPageInner() {
     return () => clearTimeout(t);
   }, [view, mapReady]);
   
-  useEffect(() => {
+
+
+useEffect(() => {
   if (!mapObjRef.current || !mapReady) return;
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      mapObjRef.current.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      mapObjRef.current.setZoom(12);
-    },
-    () => {} // stay on Pune if denied
+  mapObjRef.current.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+  mapObjRef.current.setZoom(12);
+},
+    () => {
+      // fallback — use stored coords first before Pune
+      if (storedLat && storedLng) {
+        mapObjRef.current.panTo({ lat: storedLat, lng: storedLng });
+      } else {
+        mapObjRef.current.panTo({ lat: 18.5204, lng: 73.8567 });
+      }
+    }
   );
 }, [mapReady]);
 
@@ -435,7 +541,7 @@ useEffect(() => {
         style={{ background: bgPage }}>
 
         {/* ── Geo loading screen — shown while waiting for location ── */}
-        {geoLoading && (
+        {geoLoading && !storedLat && (
           <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center gap-4"
             style={{ background: bgPage }}>
             <div className="w-16 h-16 rounded-2xl bg-amber-400/15 flex items-center justify-center map-pulse">
@@ -539,43 +645,80 @@ useEffect(() => {
                 })}
               </div>
 
-              {/* Geo status + radius slider */}
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Location badge */}
-                <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0
-                  ${locationGranted
-                    ? dark ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-400" : "border-emerald-300 bg-emerald-50 text-emerald-700"
-                    : dark ? "border-white/10 bg-white/5 text-white/30" : "border-stone-200 bg-stone-100 text-stone-400"
-                  }`}>
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
-                  </svg>
-                  {locationGranted ? "Using your location" : "Using Pune (default)"}
-                </div>
+{/* Geo status + radius */}
+<div className="flex items-center gap-2 flex-wrap">
 
-                {/* API loading indicator */}
-                {eventsLoading && (
-                  <div className={`flex items-center gap-1.5 text-[10px] font-bold ${t3}`}>
-                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    Searching…
-                  </div>
-                )}
+  {/* Location badge */}
+  <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0
+    ${locationGranted || storedLat
+      ? dark ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-400" : "border-emerald-300 bg-emerald-50 text-emerald-700"
+      : dark ? "border-white/10 bg-white/5 text-white/30" : "border-stone-200 bg-stone-100 text-stone-400"
+    }`}>
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+    </svg>
+    {city ?? (locationGranted ? "Your location" : "Pune (default)")}
+  </div>
 
-                {/* Radius slider */}
-                <div className="flex items-center gap-2 ml-auto">
-                  <span className={`text-[10px] font-bold flex-shrink-0 ${t3}`}>Radius</span>
-                  <input
-                    type="range" min="1" max="1000" step="1" value={radius}
-                    onChange={e => setRadius(Number(e.target.value))}
-                    className="w-24 accent-amber-500 cursor-pointer"
-                  />
-                  <span className={`text-[10px] font-black w-10 flex-shrink-0 ${t2}`}>{radius} km</span>
-                </div>
-              </div>
-            </div>
+  {/* Refetch GPS */}
+  <button
+    title="Use my current location"
+    onClick={() => {
+      clearLocation();
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+          mapObjRef.current?.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          mapObjRef.current?.setZoom(12);
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`, { headers: { "Accept-Language": "en" } });
+            const data = await res.json();
+            const addr = data.address ?? {};
+            setLocation({ city: addr.city ?? addr.town ?? addr.village ?? null, country: addr.country ?? null });
+          } catch {}
+        },
+        () => {}
+      );
+    }}
+    className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all hover:scale-110 flex-shrink-0
+      ${dark ? "bg-white/8 hover:bg-white/14 text-white/50 hover:text-white" : "bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-700"}`}>
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+    </svg>
+  </button>
+
+  {/* City search */}
+  <CitySearch dark={dark} onSelect={(lat, lng, cityName) => {
+    setLocation({ latitude: lat, longitude: lng, city: cityName });
+    mapObjRef.current?.panTo({ lat, lng });
+    mapObjRef.current?.setZoom(12);
+  }}/>
+
+  {/* Radius pills — pushed to right */}
+  <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+    <span className={`text-[10px] font-bold ${t3}`}>Radius</span>
+    <div className="flex items-center gap-1">
+      {[50, 100, 150, 200].map(val => (
+        <button
+          key={val}
+          onClick={() => setRadius(val)}
+          className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all
+            ${radius === val
+              ? "bg-amber-500 text-white shadow-sm shadow-amber-500/30"
+              : dark
+                ? "bg-white/6 text-white/35 hover:text-white hover:bg-white/12 border border-white/8"
+                : "bg-stone-100 text-stone-400 hover:text-stone-700 hover:bg-stone-200 border border-stone-200"
+            }`}>
+          {val}
+        </button>
+      ))}
+    </div>
+    <span className={`text-[10px] font-semibold ${t3}`}>km</span>
+  </div>
+
+</div>
+  </div>
+  
           </div>
 
           {/* ── Two-panel layout ── */}
