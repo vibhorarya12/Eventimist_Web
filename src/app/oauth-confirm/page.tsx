@@ -5,6 +5,7 @@ import { useOrganizerOAuth } from '@/hooks/eventimist/organizer/auth/useOrganize
 import { useOrganizerAuth } from '@/store/eventimist/organizer/auth/AuthState';
 import { useClerk } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
 export default function OauthConfirm() {
   const router         = useRouter();
@@ -70,7 +71,7 @@ export default function OauthConfirm() {
     : 'Continue to Dashboard';
 
   return (
-    <>
+     <Suspense fallback={null}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap');
         *, *::before, *::after { box-sizing: border-box; }
@@ -237,6 +238,6 @@ export default function OauthConfirm() {
           </div>
         </div>
       </div>
-    </>
+    </Suspense>
   );
 }
