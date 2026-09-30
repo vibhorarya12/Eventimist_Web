@@ -348,7 +348,7 @@ function Nav({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
 
         {/* Links */}
         <div className="hidden md:flex items-center gap-7 text-sm font-medium">
-          {[{label:"Discover",href:"/discover"},{label:"Organize",href:"/organizer"},{label:"Volunteer",href:"/volunteer"},{label:"Eventix Space",href:"/eventix"}].map(n => (
+          {[{label:"Discover",href:"/discover"},{label:"Organize",href:"/organizer"},{label:"Volunteer",href:"/volunteer"},{label:"Eventix Space",href:"/eventix"} ,{label:"About",href:"/about"}].map(n => (
             <a key={n.label} href={n.href} className={`transition-colors duration-200 ${link}`}>{n.label}</a>
           ))}
         </div>
@@ -593,7 +593,7 @@ function VideoSection() {
                 </div>
               </>
             ) : (
-              <iframe className="w-full h-full" src="https://www.youtube.com/embed/XRzcnvwyrCg?autoplay=1&rel=0&modestbranding=1" title="Eventimist" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ border:"none" }}/>
+              <iframe className="w-full h-full" src="3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333" title="Eventimist" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ border:"none" }}/>
             )}
           </div>
         </div>
@@ -829,7 +829,7 @@ export default function Page() {
         <Nav dark={dark} onToggle={toggle}/>
         <Hero dark={dark}/>
         <Ticker dark={dark}/>
-        <VideoSection/>
+        {/* <VideoSection/> */}
         <Features dark={dark}/>
         <HowItWorks dark={dark}/>
         <VolunteerSection dark={dark}/>
